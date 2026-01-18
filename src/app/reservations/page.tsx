@@ -22,17 +22,17 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { Plus, Check, X, Calendar as CalendarIcon, Filter, Pencil, Trash2, ArrowUpDown } from "lucide-react"
+import { Plus, Check, Filter, Pencil, Trash2, ArrowUpDown, Download } from "lucide-react"
+import * as XLSX from 'xlsx';
 import { ReservationForm } from "@/components/ReservationForm"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase"
 import { useState } from "react"
-import { format, addDays, isSameDay } from "date-fns"
-import { ko } from "date-fns/locale"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Calendar } from "@/components/ui/calendar"
-import { cn } from "@/lib/utils"
+import { format, addDays } from "date-fns"
+import { useSearchParams } from "next/navigation"
+
 import { DateRange } from "react-day-picker"
+import { DateRangePicker } from "@/components/DateRangePicker"
 
 type SortConfig = {
     key: string
@@ -40,16 +40,23 @@ type SortConfig = {
 }
 
 export default function ReservationsPage() {
+    const searchParams = useSearchParams()
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [editingReservation, setEditingReservation] = useState<any>(null)
 
     // Date Range State
-    const [dateRange, setDateRange] = useState<DateRange | undefined>({
-        from: new Date(),
-        to: addDays(new Date(), 7), // Default to next 7 days
+    const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
+        const dateParam = searchParams.get('date')
+        if (dateParam) {
+            const d = new Date(dateParam)
+            return { from: d, to: d }
+        }
+        return {
+            from: new Date(),
+            to: addDays(new Date(), 7), // Default to next 7 days
+        }
     })
-    const [tempDateRange, setTempDateRange] = useState<DateRange | undefined>()
-    const [isCalendarOpen, setIsCalendarOpen] = useState(false)
+
 
     // Sorting State
     const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'reservation_type', direction: 'asc' })
@@ -144,6 +151,64 @@ export default function ReservationsPage() {
     // Helper to format currency
     const fmtMoney = (amount: any) => Number(amount || 0).toLocaleString()
 
+    const handleExportExcel = () => {
+        if (!reservations || reservations.length === 0) {
+            alert("다운로드할 데이터가 없습니다.")
+            return
+        }
+
+        // Format data for Excel
+        const excelData = reservations.map((res: any) => ({
+            "유형": getTypeLabel(res.reservation_type),
+            "날짜": format(new Date(res.date), "yyyy-MM-dd"),
+            "예약자명": res.customer_name,
+            "전화번호": res.phone || "",
+            "인원": res.headcount,
+            "숙소": res.accommodations?.name || "",
+            "이용권": res.tickets?.name || "",
+            "픽업위치": res.pickup_location || "",
+            "픽업시간": res.pickup_time || "",
+            "총액": Number(res.total_amount || 0),
+            "예약금": Number(res.deposit || 0),
+            "잔금": Number(res.balance || 0),
+            "메모": res.notes || "",
+            "상태": res.status === 'booked' ? '예약됨' :
+                res.status === 'completed' ? '완료' :
+                    res.status === 'cancelled' ? '취소됨' : res.status
+        }))
+
+        // Create workbook and worksheet
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(excelData);
+
+        // Adjust column widths (optional)
+        const wscols = [
+            { wch: 10 }, // 유형
+            { wch: 12 }, // 날짜
+            { wch: 10 }, // 예약자명
+            { wch: 15 }, // 전화번호
+            { wch: 6 },  // 인원
+            { wch: 20 }, // 숙소
+            { wch: 20 }, // 이용권
+            { wch: 15 }, // 픽업위치
+            { wch: 10 }, // 픽업시간
+            { wch: 10 }, // 총액
+            { wch: 10 }, // 예약금
+            { wch: 10 }, // 잔금
+            { wch: 30 }, // 메모
+            { wch: 10 }, // 상태
+        ];
+        ws['!cols'] = wscols;
+
+        XLSX.utils.book_append_sheet(wb, ws, "예약목록");
+
+        // Generate file name with date range
+        const fileName = `예약목록_${dateRange?.from ? format(dateRange.from, "yyyyMMdd") : "all"}${dateRange?.to ? "_" + format(dateRange.to, "yyyyMMdd") : ""}.xlsx`;
+
+        // Download file
+        XLSX.writeFile(wb, fileName);
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -152,70 +217,18 @@ export default function ReservationsPage() {
                 </h1>
 
                 <div className="flex items-center gap-2">
-                    {/* Date Range Picker Filter */}
-                    <Popover
-                        open={isCalendarOpen}
-                        onOpenChange={(open) => {
-                            setIsCalendarOpen(open)
-                            if (open) {
-                                setTempDateRange(undefined) // Reset selection when opening
-                            }
-                        }}
-                    >
-                        <PopoverTrigger asChild>
-                            <Button
-                                variant={"outline"}
-                                className={cn(
-                                    "w-[260px] justify-start text-left font-normal",
-                                    !dateRange && "text-muted-foreground"
-                                )}
-                            >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {dateRange?.from ? (
-                                    dateRange.to ? (
-                                        <>
-                                            {format(dateRange.from, "MM.dd", { locale: ko })} - {format(dateRange.to, "MM.dd", { locale: ko })}
-                                        </>
-                                    ) : (
-                                        format(dateRange.from, "MM.dd", { locale: ko })
-                                    )
-                                ) : (
-                                    <span>기간 선택</span>
-                                )}
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="end">
-                            <Calendar
-                                locale={ko}
-                                initialFocus
-                                mode="range"
-                                defaultMonth={tempDateRange?.from || dateRange?.from || new Date()}
-                                selected={tempDateRange}
-                                onSelect={(range, selectedDay) => {
-                                    // Handle single day selection (double click on same day)
-                                    // If range becomes undefined (unselect) but we have a start date and clicked the same day
-                                    if (!range && tempDateRange?.from && selectedDay && isSameDay(tempDateRange.from, selectedDay)) {
-                                        const newRange = { from: tempDateRange.from, to: tempDateRange.from }
-                                        setTempDateRange(newRange)
-                                        setDateRange(newRange)
-                                        setIsCalendarOpen(false)
-                                        return
-                                    }
-
-                                    setTempDateRange(range)
-                                    // Auto close if both dates selected
-                                    if (range?.from && range?.to) {
-                                        setDateRange(range)
-                                        setIsCalendarOpen(false)
-                                    }
-                                }}
-                                numberOfMonths={2}
-                            />
-                        </PopoverContent>
-                    </Popover>
+                    <DateRangePicker
+                        date={dateRange}
+                        onDateChange={setDateRange}
+                    />
 
                     <Button variant="outline" onClick={() => setDateRange(undefined)} title="전체 보기">
                         <Filter className="h-4 w-4" />
+                    </Button>
+
+                    <Button variant="outline" onClick={handleExportExcel} title="엑셀 다운로드">
+                        <Download className="h-4 w-4 mr-2" />
+                        엑셀 저장
                     </Button>
 
                     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

@@ -4,9 +4,10 @@ import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recha
 
 interface StatsChartProps {
     data: any[]
+    onBarClick?: (data: any) => void
 }
 
-export function StatsChart({ data }: StatsChartProps) {
+export function StatsChart({ data, onBarClick }: StatsChartProps) {
     return (
         <ResponsiveContainer width="100%" height={350}>
             <BarChart data={data}>
@@ -26,9 +27,17 @@ export function StatsChart({ data }: StatsChartProps) {
                 />
                 <Tooltip
                     cursor={{ fill: 'transparent' }}
-                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                    contentStyle={{ backgroundColor: '#fff', color: '#000', borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                    itemStyle={{ color: '#000' }}
+                    labelStyle={{ color: '#000', fontWeight: 'bold' }}
                 />
-                <Bar dataKey="total" fill="currentColor" radius={[4, 4, 0, 0]} className="fill-primary" />
+                <Bar
+                    dataKey="total"
+                    fill="currentColor"
+                    radius={[4, 4, 0, 0]}
+                    className="fill-primary cursor-pointer"
+                    onClick={(data) => onBarClick?.(data)}
+                />
             </BarChart>
         </ResponsiveContainer>
     )
