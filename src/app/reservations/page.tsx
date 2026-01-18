@@ -27,7 +27,7 @@ import * as XLSX from 'xlsx';
 import { ReservationForm } from "@/components/ReservationForm"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase"
-import { useState } from "react"
+import { useState, Suspense } from "react"
 import { format, addDays } from "date-fns"
 import { useSearchParams } from "next/navigation"
 
@@ -39,8 +39,17 @@ type SortConfig = {
     direction: 'asc' | 'desc'
 }
 
-export default function ReservationsPage() {
+function ReservationsContent() {
     const searchParams = useSearchParams()
+    // ... (rest of the component logic stays same)
+
+    // ... I need to be careful not to delete the body.
+    // Replace_file_content typically replaces the chunks.
+    // If I select lines 30-42, I am replacing imports and function declaration.
+    // Then I need to append to the end.
+    // I will do it in two chunks? No, Step 3 requires strictly sequential tools or single tool call.
+    // "multi_replace_file_content" is better here.
+
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [editingReservation, setEditingReservation] = useState<any>(null)
 
@@ -391,5 +400,13 @@ export default function ReservationsPage() {
                 </CardContent>
             </Card>
         </div>
+    )
+}
+
+export default function ReservationsPage() {
+    return (
+        <Suspense fallback={<div className="flex items-center justify-center p-8">불러오는 중...</div>}>
+            <ReservationsContent />
+        </Suspense>
     )
 }
