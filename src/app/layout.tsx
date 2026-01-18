@@ -3,6 +3,7 @@ import { Inter, Outfit } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 import { Sidebar } from "@/components/Sidebar";
+import { MobileNav } from "@/components/MobileNav";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const outfit = Outfit({ subsets: ["latin"], variable: "--font-outfit" });
@@ -23,11 +24,16 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} ${outfit.variable} font-sans antialiased bg-background`}>
         <Providers>
-          <div className="flex h-screen overflow-hidden">
-            <Sidebar />
-            <main className="flex-1 overflow-auto p-8">
-              {children}
-            </main>
+          <div className="flex h-screen overflow-hidden flex-col md:flex-row">
+            <div className="hidden md:block h-full">
+              <Sidebar />
+            </div>
+            <div className="flex-1 flex flex-col h-full overflow-hidden">
+              <MobileNav />
+              <main className="flex-1 overflow-auto p-4 md:p-8">
+                {children}
+              </main>
+            </div>
           </div>
         </Providers>
       </body>

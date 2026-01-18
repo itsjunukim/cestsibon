@@ -6,6 +6,7 @@ import {
     CardContent,
     CardHeader,
     CardTitle,
+    CardDescription,
 } from "@/components/ui/card"
 import {
     Dialog,
@@ -260,7 +261,8 @@ function ReservationsContent() {
                 </div>
             </div>
 
-            <Card>
+            {/* Desktop View */}
+            <Card className="hidden md:block">
                 <CardHeader>
                     <div className="flex justify-between items-center">
                         <CardTitle>예약 목록
@@ -399,6 +401,104 @@ function ReservationsContent() {
                     </Table>
                 </CardContent>
             </Card>
+
+            {/* Mobile View */}
+            <div className="md:hidden space-y-4">
+                {isLoading ? (
+                    <div className="text-center py-8">불러오는 중...</div>
+                ) : reservations?.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground border rounded-lg bg-white p-4">
+                        해당 기간에 예약이 없습니다.
+                    </div>
+                ) : (
+                    reservations?.map((res: any) => (
+                        <Card key={res.id} className="overflow-hidden">
+                            <div className={`h-2 w-full ${res.reservation_type === 'accommodation' ? 'bg-indigo-500' : 'bg-orange-500'}`} />
+                            <CardHeader className="pb-2 pt-4">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <CardTitle className="text-lg flex items-center gap-2">
+                                            {res.customer_name}
+                                            <span className="text-sm font-normal text-muted-foreground">({res.headcount}명)</span>
+                                        </CardTitle>
+                                        <CardDescription className="mt-1">
+                                            {format(new Date(res.date), "yyyy-MM-dd")} • {res.phone || "연락처 없음"}
+                                        </CardDescription>
+                                    </div>
+                                    <span className={`px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${res.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                        res.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                                            'bg-yellow-100 text-yellow-700'
+                                        }`}>
+                                        {res.status === 'booked' ? '예약됨' :
+                                            res.status === 'completed' ? '완료' :
+                                                res.status === 'cancelled' ? '취소됨' : res.status}
+                                    </span>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="text-sm space-y-3 pb-3">
+                                <div className="grid grid-cols-2 gap-2 p-3 bg-muted/50 rounded-lg">
+                                    {res.accommodations?.name && (
+                                        <div className="col-span-2 flex items-center gap-2">
+                                            <span className="text-muted-foreground w-12 shrink-0">숙소</span>
+                                            <span className="font-medium text-indigo-700">🏠 {res.accommodations.name}</span>
+                                        </div>
+                                    )}
+                                    {res.tickets?.name && (
+                                        <div className="col-span-2 flex items-center gap-2">
+                                            <span className="text-muted-foreground w-12 shrink-0">이용권</span>
+                                            <span className="font-medium text-orange-700">🎫 {res.tickets.name}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-muted-foreground w-12 shrink-0">픽업</span>
+                                        <span className="truncate">{res.pickup_location || "-"}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-muted-foreground w-12 shrink-0">시간</span>
+                                        <span>{res.pickup_time || "-"}</span>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">총액</span>
+                                        <span className="font-bold">{fmtMoney(res.total_amount)}원</span>
+                                    </div>
+                                    <div className="flex justify-between text-xs">
+                                        <span className="text-muted-foreground">예약금</span>
+                                        <span>{fmtMoney(res.deposit)}원</span>
+                                    </div>
+                                    {Number(res.balance) > 0 &&
+                                        <div className="flex justify-between text-red-600 font-bold">
+                                            <span>잔금</span>
+                                            <span>{fmtMoney(res.balance)}원</span>
+                                        </div>
+                                    }
+                                </div>
+
+                                {res.notes && (
+                                    <div className="p-2 bg-yellow-50 text-yellow-800 rounded text-xs">
+                                        Memo: {res.notes}
+                                    </div>
+                                )}
+                            </CardContent>
+                            <div className="flex items-center justify-end gap-2 p-3 border-t bg-muted/20">
+                                {res.status === 'booked' && (
+                                    <Button size="sm" variant="outline" onClick={() => updateStatus(res.id, 'completed')} className="text-green-600 hover:text-green-700 border-green-200 hover:bg-green-50">
+                                        <Check className="h-4 w-4 mr-1" /> 완료
+                                    </Button>
+                                )}
+                                <Button size="sm" variant="ghost" onClick={() => openEditDialog(res)}>
+                                    <Pencil className="h-4 w-4 mr-1" /> 수정
+                                </Button>
+                                <Button size="sm" variant="ghost" onClick={() => deleteReservation(res.id)} className="text-red-500 hover:text-red-700 hover:bg-red-50">
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </Card>
+                    ))
+                )}
+            </div>
         </div>
     )
 }
