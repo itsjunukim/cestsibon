@@ -75,7 +75,7 @@ export default function TicketsPage() {
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
-                <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-orange-500">
+                <h1 className="text-3xl font-bold text-primary">
                     이용권 관리
                 </h1>
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

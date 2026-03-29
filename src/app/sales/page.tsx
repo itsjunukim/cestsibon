@@ -7,6 +7,10 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOf
 import { ko } from "date-fns/locale"
 import { DashboardStats, SalesTrendChart } from "@/components/SalesDashboardNodes"
 import { Button } from "@/components/ui/button"
+import { PinUnlockDialog } from "@/components/PinUnlockDialog"
+import { Lock } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { useEffect } from "react"
 import {
     Card,
     CardContent,
@@ -26,6 +30,19 @@ type ViewType = 'daily' | 'weekly' | 'monthly'
 
 export default function SalesPage() {
     const [viewType, setViewType] = useState<ViewType>('monthly')
+    const [isUnlocked, setIsUnlocked] = useState(false)
+    const [isPinDialogOpen, setIsPinDialogOpen] = useState(false)
+
+    useEffect(() => {
+        const unlocked = sessionStorage.getItem('dashboard_unlocked') === 'true'
+        setIsUnlocked(unlocked)
+    }, [])
+
+    const handleUnlockSuccess = () => {
+        sessionStorage.setItem('dashboard_unlocked', 'true')
+        setIsUnlocked(true)
+        setIsPinDialogOpen(false)
+    }
 
     // Derived Date Range based on ViewType
     const getDateRange = () => {
@@ -35,8 +52,8 @@ export default function SalesPage() {
         }
         if (viewType === 'weekly') {
             return {
-                from: startOfWeek(today, { locale: ko }),
-                to: endOfWeek(today, { locale: ko })
+                from: startOfWeek(today, { weekStartsOn: 1 }),
+                to: endOfWeek(today, { weekStartsOn: 1 })
             }
         }
         // monthly
@@ -96,48 +113,64 @@ export default function SalesPage() {
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-orange-500">
+                <h1 className="text-3xl font-bold text-primary">
                     영업 현황
                 </h1>
 
-                <div className="flex bg-muted p-1 rounded-lg">
+                <div className="flex items-center space-x-1 border bg-slate-100/80 rounded-md p-1 shadow-sm h-10 w-full md:w-auto">
                     <Button
-                        variant={viewType === 'daily' ? 'default' : 'ghost'}
+                        variant="ghost"
                         size="sm"
                         onClick={() => setViewType('daily')}
-                        className="w-20 rounded-md transition-all shadow-sm data-[state=inactive]:text-muted-foreground"
+                        className={`flex-1 md:w-20 rounded-md transition-all h-8 text-xs font-semibold ${viewType === 'daily' ? 'bg-white shadow-sm text-slate-900 border border-slate-200/60 hover:bg-white/90' : 'text-slate-500 hover:text-slate-700 hover:bg-white/50 border border-transparent'}`}
                     >
-                        일간
+                        오늘
                     </Button>
                     <Button
-                        variant={viewType === 'weekly' ? 'default' : 'ghost'}
+                        variant="ghost"
                         size="sm"
                         onClick={() => setViewType('weekly')}
-                        className="w-20 rounded-md transition-all shadow-sm data-[state=inactive]:text-muted-foreground"
+                        className={`flex-1 md:w-20 rounded-md transition-all h-8 text-xs font-semibold ${viewType === 'weekly' ? 'bg-white shadow-sm text-slate-900 border border-slate-200/60 hover:bg-white/90' : 'text-slate-500 hover:text-slate-700 hover:bg-white/50 border border-transparent'}`}
                     >
-                        주간
+                        이번 주
                     </Button>
                     <Button
-                        variant={viewType === 'monthly' ? 'default' : 'ghost'}
+                        variant="ghost"
                         size="sm"
                         onClick={() => setViewType('monthly')}
-                        className="w-20 rounded-md transition-all shadow-sm data-[state=inactive]:text-muted-foreground"
+                        className={`flex-1 md:w-20 rounded-md transition-all h-8 text-xs font-semibold ${viewType === 'monthly' ? 'bg-white shadow-sm text-slate-900 border border-slate-200/60 hover:bg-white/90' : 'text-slate-500 hover:text-slate-700 hover:bg-white/50 border border-transparent'}`}
                     >
-                        월간
+                        이번 달
                     </Button>
                 </div>
             </div>
 
-            <DashboardStats
-                sales={totalSales}
-                reservations={totalCount}
-                avgSales={avgSales}
-            />
+            <div className="relative">
+                <div className={cn("transition-all duration-300", !isUnlocked && "blur-md select-none opacity-50")}>
+                    <DashboardStats
+                        sales={isUnlocked ? totalSales : 0}
+                        reservations={totalCount}
+                        avgSales={isUnlocked ? avgSales : 0}
+                    />
+                </div>
+                {!isUnlocked && (
+                    <div 
+                        className="absolute inset-0 z-10 flex items-center justify-center cursor-pointer rounded-xl hover:bg-black/5 transition-colors"
+                        onClick={() => setIsPinDialogOpen(true)}
+                    >
+                        <div className="bg-white/90 backdrop-blur-md px-4 py-2 rounded-full border shadow-sm flex items-center gap-2">
+                            <Lock className="w-5 h-5 text-slate-700" />
+                            <span className="text-sm font-bold text-slate-700">잠금 해제</span>
+                        </div>
+                    </div>
+                )}
+            </div>
 
-            <div className="grid gap-6 md:grid-cols-1">
-                <SalesTrendChart data={chartData} />
+            <div className="grid gap-6 md:grid-cols-1 relative">
+                <div className={cn("transition-all duration-300 space-y-6", !isUnlocked && "blur-md select-none opacity-30 pointer-events-none")}>
+                    <SalesTrendChart data={chartData} />
 
-                <Card className="border-none shadow-md">
+                    <Card className="border-none shadow-md">
                     <CardHeader>
                         <CardTitle>상세 내역</CardTitle>
                     </CardHeader>
@@ -193,7 +226,25 @@ export default function SalesPage() {
                         </Table>
                     </CardContent>
                 </Card>
+                </div>
+                {!isUnlocked && (
+                    <div 
+                        className="absolute inset-0 z-10 flex items-center justify-center cursor-pointer rounded-xl hover:bg-black/5 transition-colors"
+                        onClick={() => setIsPinDialogOpen(true)}
+                    >
+                        <div className="bg-white/90 backdrop-blur-md px-4 py-2 rounded-full border shadow-sm flex items-center gap-2">
+                            <Lock className="w-5 h-5 text-slate-700" />
+                            <span className="text-sm font-bold text-slate-700">잠금 해제</span>
+                        </div>
+                    </div>
+                )}
             </div>
+
+            <PinUnlockDialog 
+                isOpen={isPinDialogOpen} 
+                onClose={() => setIsPinDialogOpen(false)} 
+                onUnlock={handleUnlockSuccess} 
+            />
         </div>
     )
 

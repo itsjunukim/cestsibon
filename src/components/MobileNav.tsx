@@ -78,7 +78,7 @@ export function MobileNav() {
                 <div className="relative h-8 w-8">
                     <img src="/logo.png" alt="Logo" className="object-contain w-full h-full" />
                 </div>
-                <span className="font-bold text-lg bg-clip-text text-transparent bg-gradient-to-r from-primary to-orange-500">
+                <span className="font-bold text-lg text-primary">
                     쎄시봉
                 </span>
             </div>

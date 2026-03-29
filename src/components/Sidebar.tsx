@@ -87,7 +87,7 @@ export function Sidebar() {
                 <div className="relative h-14 w-14">
                     <img src="/logo.png" alt="Logo" className="object-contain w-full h-full" />
                 </div>
-                <span className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-orange-500 leading-tight">
+                <span className="text-lg font-bold text-primary leading-tight">
                     쎄시봉<br />
                     영업관리시스템
                 </span>

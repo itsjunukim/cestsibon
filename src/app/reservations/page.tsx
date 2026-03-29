@@ -23,13 +23,19 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { Plus, Check, Filter, Pencil, Trash2, ArrowUpDown, Download } from "lucide-react"
+import { Plus, Check, Filter, Pencil, Trash2, ArrowUpDown, Download, Columns, Search, Ban } from "lucide-react"
 import * as XLSX from 'xlsx';
 import { ReservationForm } from "@/components/ReservationForm"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Input } from "@/components/ui/input"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Calendar } from "@/components/ui/calendar"
+import { cn } from "@/lib/utils"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase"
-import { useState, Suspense } from "react"
-import { format, addDays } from "date-fns"
+import { useState, Suspense, useEffect, useRef } from "react"
+import { format, addDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns"
 import { useSearchParams } from "next/navigation"
 
 import { DateRange } from "react-day-picker"
@@ -53,6 +59,21 @@ function ReservationsContent() {
 
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [editingReservation, setEditingReservation] = useState<any>(null)
+    const [selectedRowId, setSelectedRowId] = useState<string | null>(null)
+    const tableRef = useRef<HTMLDivElement>(null)
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (tableRef.current && !tableRef.current.contains(event.target as Node)) {
+                const target = event.target as Element;
+                if (!target.closest('[role="dialog"]') && !target.closest('button')) {
+                    setSelectedRowId(null)
+                }
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside)
+        return () => document.removeEventListener("mousedown", handleClickOutside)
+    }, [])
 
     // Date Range State
     const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
@@ -61,15 +82,49 @@ function ReservationsContent() {
             const d = new Date(dateParam)
             return { from: d, to: d }
         }
+        const today = new Date();
         return {
-            from: new Date(),
-            to: addDays(new Date(), 7), // Default to next 7 days
+            from: startOfDay(today),
+            to: endOfDay(today),
         }
     })
 
+    const [searchKeyword, setSearchKeyword] = useState<string>("")
+
+    // Quick Date Filters
+    const setToday = () => {
+        const today = new Date()
+        setDateRange({ from: startOfDay(today), to: endOfDay(today) })
+    }
+
+    const setThisWeek = () => {
+        const today = new Date()
+        setDateRange({ 
+            from: startOfWeek(today, { weekStartsOn: 1 }), 
+            to: endOfWeek(today, { weekStartsOn: 1 }) 
+        })
+    }
+
+    const setThisMonth = () => {
+        const today = new Date()
+        setDateRange({ 
+            from: startOfMonth(today), 
+            to: endOfMonth(today) 
+        })
+    }
 
     // Sorting State
     const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'reservation_type', direction: 'asc' })
+
+    // Column Visibility State
+    const [visibleColumns, setVisibleColumns] = useState({
+        type: true, date: true, customer: true, headcount: true,
+        accommodation: true, ticket: true, pickup: true,
+        payment: true, notes: true, status: true, visit: true,
+    })
+    const toggleColumn = (key: keyof typeof visibleColumns) => {
+        setVisibleColumns(prev => ({ ...prev, [key]: !prev[key] }))
+    }
 
     const supabase = createClient()
     const queryClient = useQueryClient()
@@ -131,14 +186,63 @@ function ReservationsContent() {
         queryClient.invalidateQueries({ queryKey: ["reservations"] })
     }
 
-    const deleteReservation = async (id: string) => {
-        if (!confirm("정말 예약을 삭제하시겠습니까?")) return
-        const { error } = await supabase.from("reservations").delete().eq("id", id)
-        if (error) {
-            console.error(error)
-            alert("삭제 실패")
+    const updateVisitStatus = async (id: string, is_visited: boolean) => {
+        // Optimistic UI Update
+        queryClient.setQueriesData({ queryKey: ["reservations"] }, (old: any) => {
+            if (!old) return old
+            return old.map((res: any) => res.id === id ? { ...res, is_visited } : res)
+        })
+
+        await supabase.from("reservations").update({ is_visited }).eq("id", id)
+        queryClient.invalidateQueries({ queryKey: ["reservations"] })
+    }
+
+    const updateDeposit = async (id: string, is_deposit_paid: boolean, deposit_paid_date: string | null) => {
+        let dateToSave = deposit_paid_date;
+        if (is_deposit_paid && !dateToSave) {
+            dateToSave = format(new Date(), "yyyy-MM-dd")
+        }
+        
+        // Optimistic UI Update
+        queryClient.setQueriesData({ queryKey: ["reservations"] }, (old: any) => {
+            if (!old) return old
+            return old.map((res: any) => res.id === id ? { ...res, is_deposit_paid, deposit_paid_date: is_deposit_paid ? dateToSave : null } : res)
+        })
+
+        await supabase.from("reservations").update({ is_deposit_paid, deposit_paid_date: is_deposit_paid ? dateToSave : null }).eq("id", id)
+        queryClient.invalidateQueries({ queryKey: ["reservations"] })
+    }
+
+    const updateBalanceMethod = async (id: string, balance_payment_method: string | null) => {
+        // Optimistic UI Update
+        queryClient.setQueriesData({ queryKey: ["reservations"] }, (old: any) => {
+            if (!old) return old
+            return old.map((res: any) => res.id === id ? { ...res, balance_payment_method } : res)
+        })
+
+        await supabase.from("reservations").update({ balance_payment_method }).eq("id", id)
+        queryClient.invalidateQueries({ queryKey: ["reservations"] })
+    }
+
+    const deleteReservation = async (id: string, currentStatus?: string) => {
+        if (currentStatus === 'cancelled') {
+            if (!confirm("이미 취소된 예약입니다. 데이터가 완전히 삭제되며 복구할 수 없습니다.\n정말 '영구 삭제' 하시겠습니까?")) return
+            const { error } = await supabase.from("reservations").delete().eq("id", id)
+            if (error) {
+                console.error(error)
+                alert("삭제 실패")
+            } else {
+                queryClient.invalidateQueries({ queryKey: ["reservations"] })
+            }
         } else {
-            queryClient.invalidateQueries({ queryKey: ["reservations"] })
+            if (!confirm("정말 이 예약을 취소하시겠습니까?\n시스템에서 완전히 삭제되지 않으며 '취소됨' 상태로 보존됩니다.")) return
+            const { error } = await supabase.from("reservations").update({ status: 'cancelled' }).eq("id", id)
+            if (error) {
+                console.error(error)
+                alert("취소 처리 실패")
+            } else {
+                queryClient.invalidateQueries({ queryKey: ["reservations"] })
+            }
         }
     }
 
@@ -149,6 +253,7 @@ function ReservationsContent() {
 
     const openEditDialog = (res: any) => {
         setEditingReservation(res)
+        setSelectedRowId(res.id)
         setIsDialogOpen(true)
     }
 
@@ -158,17 +263,28 @@ function ReservationsContent() {
         return type || '-'
     }
 
+    // Client-side filtering
+    const filteredReservations = reservations?.filter((res: any) => {
+        if (!searchKeyword) return true;
+        const kw = searchKeyword.toLowerCase();
+        return (
+            res.customer_name?.toLowerCase().includes(kw) ||
+            res.phone?.includes(kw) ||
+            res.notes?.toLowerCase().includes(kw)
+        );
+    });
+
     // Helper to format currency
     const fmtMoney = (amount: any) => Number(amount || 0).toLocaleString()
 
     const handleExportExcel = () => {
-        if (!reservations || reservations.length === 0) {
+        if (!filteredReservations || filteredReservations.length === 0) {
             alert("다운로드할 데이터가 없습니다.")
             return
         }
 
         // Format data for Excel
-        const excelData = reservations.map((res: any) => ({
+        const excelData = filteredReservations.map((res: any) => ({
             "유형": getTypeLabel(res.reservation_type),
             "날짜": format(new Date(res.date), "yyyy-MM-dd"),
             "예약자명": res.customer_name,
@@ -222,24 +338,90 @@ function ReservationsContent() {
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-orange-500">
+                <h1 className="text-3xl font-bold text-primary">
                     예약 관리
                 </h1>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-3 mt-4 md:mt-0">
+                    <div className="relative w-full md:w-56 lg:w-64 max-w-sm">
+                        <Search className="absolute left-2.5 top-[8.5px] h-4 w-4 text-muted-foreground" />
+                        <Input
+                            type="text"
+                            placeholder="이름, 연락처, 메모 검색..."
+                            className="pl-8 bg-white h-9 shadow-sm"
+                            value={searchKeyword}
+                            onChange={(e) => setSearchKeyword(e.target.value)}
+                        />
+                    </div>
+
+                    <div className="flex items-center space-x-1 border bg-slate-100/80 rounded-md p-1 shadow-sm h-9">
+                        <Button variant="ghost" size="sm" onClick={setToday} className="h-7 text-xs px-2.5 font-semibold hover:bg-white text-slate-700">오늘</Button>
+                        <Button variant="ghost" size="sm" onClick={setThisWeek} className="h-7 text-xs px-2.5 font-semibold hover:bg-white text-slate-700">이번주</Button>
+                        <Button variant="ghost" size="sm" onClick={setThisMonth} className="h-7 text-xs px-2.5 font-semibold hover:bg-white text-slate-700">이번달</Button>
+                    </div>
+
                     <DateRangePicker
                         date={dateRange}
                         onDateChange={setDateRange}
                     />
 
-                    <Button variant="outline" onClick={() => setDateRange(undefined)} title="전체 보기">
-                        <Filter className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center space-x-1 border bg-background rounded-md h-9 px-1 shadow-sm">
+                        <Button variant="ghost" className="h-7 w-7 p-0 hover:bg-muted" onClick={() => setDateRange(undefined)} title="날짜 필터 초기화(전체 보기)">
+                            <Filter className="h-4 w-4 text-foreground" />
+                        </Button>
 
-                    <Button variant="outline" onClick={handleExportExcel} title="엑셀 다운로드">
-                        <Download className="h-4 w-4 mr-2" />
-                        엑셀 저장
-                    </Button>
+                        <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-muted" onClick={handleExportExcel} title="엑셀 저장">
+                            <Download className="h-4 w-4 text-foreground" />
+                        </Button>
+
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-muted" title="목록 표시 설정">
+                                    <Columns className="h-4 w-4 text-foreground" />
+                                </Button>
+                            </PopoverTrigger>
+                        <PopoverContent className="w-56" align="end">
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between pb-2 border-b">
+                                    <h4 className="font-medium text-sm">표시할 항목</h4>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-6 px-2 text-xs"
+                                        onClick={() => {
+                                            const allChecked = Object.values(visibleColumns).every(Boolean);
+                                            const newState = Object.keys(visibleColumns).reduce((acc, key) => {
+                                                acc[key as keyof typeof visibleColumns] = !allChecked;
+                                                return acc;
+                                            }, {} as typeof visibleColumns);
+                                            setVisibleColumns(newState);
+                                        }}
+                                    >
+                                        {Object.values(visibleColumns).every(Boolean) ? "전체 해제" : "전체 선택"}
+                                    </Button>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {Object.entries({
+                                        type: "유형", date: "날짜", customer: "예약자", headcount: "인원", 
+                                        accommodation: "숙소", ticket: "이용권", pickup: "픽업", 
+                                        payment: "결제", notes: "메모", status: "상태", visit: "방문"
+                                    }).map(([key, label]) => (
+                                        <div key={key} className="flex items-center space-x-2">
+                                            <Checkbox 
+                                                id={`col-${key}`}
+                                                checked={visibleColumns[key as keyof typeof visibleColumns]}
+                                                onCheckedChange={() => toggleColumn(key as keyof typeof visibleColumns)}
+                                            />
+                                            <label htmlFor={`col-${key}`} className="text-sm font-medium leading-none cursor-pointer">
+                                                {label}
+                                            </label>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </PopoverContent>
+                    </Popover>
+                    </div>
 
                     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                         <DialogTrigger asChild>
@@ -262,7 +444,7 @@ function ReservationsContent() {
             </div>
 
             {/* Desktop View */}
-            <Card className="hidden md:block">
+            <Card ref={tableRef} className="hidden md:block">
                 <CardHeader>
                     <div className="flex justify-between items-center">
                         <CardTitle>예약 목록
@@ -278,108 +460,162 @@ function ReservationsContent() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="whitespace-nowrap cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('reservation_type')}>
-                                    <div className="flex items-center gap-1">
-                                        유형
-                                        <ArrowUpDown className="h-3 w-3" />
-                                    </div>
-                                </TableHead>
-                                <TableHead className="whitespace-nowrap cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('date')}>
-                                    <div className="flex items-center gap-1">
-                                        날짜
-                                        <ArrowUpDown className="h-3 w-3" />
-                                    </div>
-                                </TableHead>
-                                <TableHead className="whitespace-nowrap">예약자</TableHead>
-                                <TableHead className="whitespace-nowrap">인원</TableHead>
-                                <TableHead className="whitespace-nowrap">숙소</TableHead>
-                                <TableHead className="whitespace-nowrap">이용권</TableHead>
-                                <TableHead className="whitespace-nowrap">픽업</TableHead>
-                                <TableHead className="whitespace-nowrap">결제 정보</TableHead>
-                                <TableHead className="whitespace-nowrap">메모</TableHead>
-                                <TableHead className="whitespace-nowrap">상태</TableHead>
+                                <TableHead className="whitespace-nowrap w-12 text-center">No.</TableHead>
+                                {visibleColumns.type && (
+                                    <TableHead className="whitespace-nowrap cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('reservation_type')}>
+                                        <div className="flex items-center gap-1">유형<ArrowUpDown className="h-3 w-3" /></div>
+                                    </TableHead>
+                                )}
+                                {visibleColumns.date && (
+                                    <TableHead className="whitespace-nowrap cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('date')}>
+                                        <div className="flex items-center gap-1">날짜<ArrowUpDown className="h-3 w-3" /></div>
+                                    </TableHead>
+                                )}
+                                {visibleColumns.visit && <TableHead className="whitespace-nowrap text-center w-[60px]">방문</TableHead>}
+                                {visibleColumns.customer && (
+                                    <TableHead className="whitespace-nowrap cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('customer_name')}>
+                                        <div className="flex items-center gap-1">예약자<ArrowUpDown className="h-3 w-3" /></div>
+                                    </TableHead>
+                                )}
+                                {visibleColumns.headcount && <TableHead className="whitespace-nowrap">인원</TableHead>}
+                                {visibleColumns.accommodation && <TableHead className="whitespace-nowrap">숙소</TableHead>}
+                                {visibleColumns.ticket && <TableHead className="whitespace-nowrap">이용권</TableHead>}
+                                {visibleColumns.pickup && <TableHead className="whitespace-nowrap">픽업</TableHead>}
+                                {visibleColumns.payment && <TableHead className="whitespace-nowrap">결제 정보</TableHead>}
+                                {visibleColumns.notes && <TableHead className="whitespace-nowrap">메모</TableHead>}
+                                {visibleColumns.status && <TableHead className="whitespace-nowrap">상태</TableHead>}
                                 <TableHead className="text-right whitespace-nowrap">관리</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {isLoading ? (
                                 <TableRow>
-                                    <TableCell colSpan={11} className="text-center">불러오는 중...</TableCell>
+                                    <TableCell colSpan={13} className="text-center">불러오는 중...</TableCell>
                                 </TableRow>
-                            ) : reservations?.length === 0 ? (
+                            ) : filteredReservations?.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
-                                        해당 기간에 예약이 없습니다.
+                                    <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
+                                        {searchKeyword ? "검색 결과가 없습니다." : "해당 기간에 예약이 없습니다."}
                                     </TableCell>
                                 </TableRow>
-                            ) : reservations?.map((res: any) => (
-                                <TableRow key={res.id} className="text-sm">
-                                    <TableCell>
-                                        <span className={`px-2 py-1 rounded text-xs font-semibold whitespace-nowrap ${res.reservation_type === 'accommodation' ? 'bg-indigo-100 text-indigo-700' :
-                                            'bg-orange-100 text-orange-700'
-                                            }`}>
-                                            {getTypeLabel(res.reservation_type)}
-                                        </span>
-                                    </TableCell>
-                                    <TableCell className="whitespace-nowrap font-medium text-gray-700">
-                                        {format(new Date(res.date), "MM-dd")}
-                                    </TableCell>
-                                    <TableCell className="whitespace-nowrap">
-                                        <div className="font-semibold">{res.customer_name}</div>
-                                        <div className="text-xs text-muted-foreground">{res.phone || "-"}</div>
-                                    </TableCell>
-                                    <TableCell>{res.headcount || 1}명</TableCell>
-                                    <TableCell className="whitespace-nowrap">
-                                        {res.accommodations?.name ? (
-                                            <span className="font-medium text-indigo-600">🏠 {res.accommodations.name}</span>
-                                        ) : "-"}
-                                    </TableCell>
-                                    <TableCell className="whitespace-nowrap">
-                                        {res.tickets?.name ? (
-                                            <span className="font-medium text-orange-600">🎫 {res.tickets.name}</span>
-                                        ) : "-"}
-                                    </TableCell>
-                                    <TableCell className="whitespace-nowrap text-xs">
-                                        {res.pickup_location || res.pickup_time ? (
-                                            <div className="flex flex-col">
-                                                <span>{res.pickup_location || "-"}</span>
-                                                <span className="text-gray-500">{res.pickup_time || ""}</span>
+                            ) : filteredReservations?.map((res: any, index: number) => (
+                                <TableRow 
+                                    key={res.id}
+                                    onClick={(e) => {
+                                        const target = e.target as HTMLElement;
+                                        if (target.tagName !== 'BUTTON' && target.tagName !== 'INPUT' && !target.closest('button')) {
+                                            setSelectedRowId(res.id);
+                                        }
+                                    }}
+                                    className={cn(
+                                        "text-sm transition-colors cursor-pointer", 
+                                        res.is_visited && "bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/40",
+                                        selectedRowId === res.id && "bg-amber-100/80 hover:bg-amber-200 shadow-[inset_0_0_0_2px_#f59e0b] z-10 relative"
+                                    )}
+                                >
+                                    <TableCell className="text-center font-medium text-muted-foreground">{index + 1}</TableCell>
+                                    {visibleColumns.type && (
+                                        <TableCell>
+                                            <span className={`px-2 py-1 rounded text-xs font-semibold whitespace-nowrap ${res.reservation_type === 'accommodation' ? 'bg-indigo-100 text-indigo-700' : 'bg-orange-100 text-orange-700'}`}>
+                                                {getTypeLabel(res.reservation_type)}
+                                            </span>
+                                        </TableCell>
+                                    )}
+                                    {visibleColumns.date && (
+                                        <TableCell className="whitespace-nowrap font-medium text-gray-700">
+                                            {format(new Date(res.date), "MM-dd")}
+                                        </TableCell>
+                                    )}
+                                    {visibleColumns.visit && (
+                                        <TableCell className="p-0 align-middle">
+                                            <div className="flex justify-center items-center w-full h-full min-h-[40px]">
+                                                <Checkbox 
+                                                    checked={res.is_visited || false} 
+                                                    onCheckedChange={(checked) => updateVisitStatus(res.id, !!checked)}
+                                                    className="h-5 w-5 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                                                    title={res.is_visited ? "방문 취소" : "방문 확인"}
+                                                />
                                             </div>
-                                        ) : (
-                                            <span className="text-gray-300">-</span>
-                                        )}
-                                    </TableCell>
-                                    <TableCell className="whitespace-nowrap">
-                                        <div className="flex flex-col space-y-1 text-xs">
-                                            <div className="flex justify-between gap-2">
-                                                <span className="text-muted-foreground">총액:</span>
-                                                <span className="font-medium">{fmtMoney(res.total_amount)}</span>
-                                            </div>
-                                            <div className="flex justify-between gap-2">
-                                                <span className="text-muted-foreground">예약금:</span>
-                                                <span>{fmtMoney(res.deposit)}</span>
-                                            </div>
-                                            {Number(res.balance) > 0 &&
-                                                <div className="flex justify-between gap-2 text-red-600 font-bold bg-red-50 px-1 rounded">
-                                                    <span>잔금:</span>
-                                                    <span>{fmtMoney(res.balance)}</span>
+                                        </TableCell>
+                                    )}
+                                    {visibleColumns.customer && (
+                                        <TableCell className="whitespace-nowrap">
+                                            <div className="font-semibold">{res.customer_name}</div>
+                                            <div className="text-xs text-foreground font-medium mt-1">{res.phone || "-"}</div>
+                                        </TableCell>
+                                    )}
+                                    {visibleColumns.headcount && <TableCell>{res.headcount || 1}명</TableCell>}
+                                    {visibleColumns.accommodation && (
+                                        <TableCell className="whitespace-nowrap">
+                                            {res.accommodations?.name ? <span className="font-medium text-indigo-600">🏠 {res.accommodations.name}</span> : "-"}
+                                        </TableCell>
+                                    )}
+                                    {visibleColumns.ticket && (
+                                        <TableCell className="whitespace-nowrap">
+                                            {res.tickets?.name ? <span className="font-medium text-orange-600">🎫 {res.tickets.name}</span> : "-"}
+                                        </TableCell>
+                                    )}
+                                    {visibleColumns.pickup && (
+                                        <TableCell className="whitespace-nowrap text-xs">
+                                            {res.pickup_location || res.pickup_time ? (
+                                                <div className="flex flex-col">
+                                                    <span>{res.pickup_location || "-"}</span>
+                                                    <span className="text-gray-500">{res.pickup_time || ""}</span>
                                                 </div>
-                                            }
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="max-w-[150px] truncate text-xs text-gray-500" title={res.notes}>
-                                        {res.notes || "-"}
-                                    </TableCell>
-                                    <TableCell>
-                                        <span className={`px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${res.status === 'completed' ? 'bg-green-100 text-green-700' :
-                                            res.status === 'cancelled' ? 'bg-red-100 text-red-700' :
-                                                'bg-yellow-100 text-yellow-700'
-                                            }`}>
-                                            {res.status === 'booked' ? '예약됨' :
-                                                res.status === 'completed' ? '완료' :
-                                                    res.status === 'cancelled' ? '취소됨' : res.status}
-                                        </span>
-                                    </TableCell>
+                                            ) : <span className="text-gray-300">-</span>}
+                                        </TableCell>
+                                    )}
+                                    {visibleColumns.payment && (
+                                        <TableCell className="whitespace-nowrap">
+                                            <div className="flex flex-col space-y-1.5 text-xs bg-slate-50/50 p-2 rounded-md border border-slate-200 min-w-[150px] shadow-sm">
+                                                <div className="flex justify-between items-center border-b border-slate-200 pb-1.5 mb-0.5">
+                                                    <span className="text-slate-700 font-bold text-[11px]">총 결제 금액</span>
+                                                    <span className="font-extrabold text-foreground text-[14px]">{fmtMoney(res.total_amount)}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-[11px]">
+                                                    <span className="text-slate-600 font-bold">예약금</span>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className={res.is_deposit_paid ? "text-green-700 font-bold" : "text-slate-800 font-bold"}>{fmtMoney(res.deposit)}</span>
+                                                        {res.is_deposit_paid && res.deposit_paid_date && (
+                                                            <span className="text-[10px] text-green-800 bg-green-100 px-1 rounded-sm font-bold shadow-sm">
+                                                                {format(new Date(res.deposit_paid_date), "MM/dd")} 완
+                                                            </span>
+                                                        )}
+                                                        {!res.is_deposit_paid && Number(res.deposit) > 0 && (
+                                                            <span className="text-[10px] text-amber-800 bg-amber-100 px-1 rounded-sm font-bold shadow-sm">미입금</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                {Number(res.balance) > 0 &&
+                                                    <div className="flex justify-between items-center text-[11px] mt-0.5">
+                                                        <span className="text-red-600 font-bold">잔금</span>
+                                                        <div className="flex items-center gap-1.5 text-red-700 font-bold">
+                                                            <span>{fmtMoney(res.balance)}</span>
+                                                            {res.balance_payment_method ? (
+                                                                <span className="text-[10px] bg-white px-1 border border-red-200 rounded-sm text-red-700 font-bold shadow-sm">
+                                                                    {res.balance_payment_method === 'transfer' ? '이체' : res.balance_payment_method === 'card' ? '카드' : res.balance_payment_method === 'cash' ? '현금' : '미정'}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-[10px] bg-red-100 px-1 rounded-sm text-red-600 font-bold shadow-sm">미정</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                }
+                                            </div>
+                                        </TableCell>
+                                    )}
+                                    {visibleColumns.notes && (
+                                        <TableCell className="max-w-[150px] truncate text-xs text-gray-500" title={res.notes}>
+                                            {res.notes || "-"}
+                                        </TableCell>
+                                    )}
+                                    {visibleColumns.status && (
+                                        <TableCell>
+                                            <span className={`px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${res.status === 'completed' ? 'bg-green-100 text-green-700' : res.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                                {res.status === 'booked' ? '예약됨' : res.status === 'completed' ? '완료' : res.status === 'cancelled' ? '취소됨' : res.status}
+                                            </span>
+                                        </TableCell>
+                                    )}
                                     <TableCell className="text-right">
                                         <div className="flex justify-end gap-1">
                                             {res.status === 'booked' && (
@@ -390,7 +626,7 @@ function ReservationsContent() {
                                             <Button variant="ghost" size="icon" title="수정" onClick={() => openEditDialog(res)} className="h-8 w-8">
                                                 <Pencil className="h-4 w-4" />
                                             </Button>
-                                            <Button variant="ghost" size="icon" title="삭제" onClick={() => deleteReservation(res.id)} className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8">
+                                            <Button variant="ghost" size="icon" title={res.status === 'cancelled' ? '영구 삭제' : '취소'} onClick={() => deleteReservation(res.id, res.status)} className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8">
                                                 <Trash2 className="h-4 w-4" />
                                             </Button>
                                         </div>
@@ -406,12 +642,12 @@ function ReservationsContent() {
             <div className="md:hidden space-y-4">
                 {isLoading ? (
                     <div className="text-center py-8">불러오는 중...</div>
-                ) : reservations?.length === 0 ? (
+                ) : filteredReservations?.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground border rounded-lg bg-white p-4">
-                        해당 기간에 예약이 없습니다.
+                        {searchKeyword ? "검색 결과가 없습니다." : "해당 기간에 예약이 없습니다."}
                     </div>
                 ) : (
-                    reservations?.map((res: any) => (
+                    filteredReservations?.map((res: any) => (
                         <Card key={res.id} className="overflow-hidden">
                             <div className={`h-2 w-full ${res.reservation_type === 'accommodation' ? 'bg-indigo-500' : 'bg-orange-500'}`} />
                             <CardHeader className="pb-2 pt-4">
@@ -421,7 +657,7 @@ function ReservationsContent() {
                                             {res.customer_name}
                                             <span className="text-sm font-normal text-muted-foreground">({res.headcount}명)</span>
                                         </CardTitle>
-                                        <CardDescription className="mt-1">
+                                        <CardDescription className="mt-1 text-foreground font-medium">
                                             {format(new Date(res.date), "yyyy-MM-dd")} • {res.phone || "연락처 없음"}
                                         </CardDescription>
                                     </div>
@@ -461,12 +697,12 @@ function ReservationsContent() {
 
                                 <div className="space-y-1">
                                     <div className="flex justify-between">
-                                        <span className="text-muted-foreground">총액</span>
+                                        <span className="text-foreground font-medium">총액</span>
                                         <span className="font-bold">{fmtMoney(res.total_amount)}원</span>
                                     </div>
-                                    <div className="flex justify-between text-xs">
-                                        <span className="text-muted-foreground">예약금</span>
-                                        <span>{fmtMoney(res.deposit)}원</span>
+                                    <div className="flex justify-between text-xs mt-1">
+                                        <span className="text-foreground font-medium">예약금</span>
+                                        <span className="font-medium">{fmtMoney(res.deposit)}원</span>
                                     </div>
                                     {Number(res.balance) > 0 &&
                                         <div className="flex justify-between text-red-600 font-bold">
@@ -491,7 +727,7 @@ function ReservationsContent() {
                                 <Button size="sm" variant="ghost" onClick={() => openEditDialog(res)}>
                                     <Pencil className="h-4 w-4 mr-1" /> 수정
                                 </Button>
-                                <Button size="sm" variant="ghost" onClick={() => deleteReservation(res.id)} className="text-red-500 hover:text-red-700 hover:bg-red-50">
+                                <Button size="sm" variant="ghost" title={res.status === 'cancelled' ? '영구 삭제' : '취소'} onClick={() => deleteReservation(res.id, res.status)} className="text-red-500 hover:text-red-700 hover:bg-red-50">
                                     <Trash2 className="h-4 w-4" />
                                 </Button>
                             </div>

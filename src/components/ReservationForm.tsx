@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createClient } from "@/lib/supabase"
 import { useQueryClient, useQuery } from "@tanstack/react-query"
 import { Loader2 } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
 import { useState } from "react"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -38,6 +39,10 @@ const formSchema = z.object({
     pickup_time: z.string().optional(),
     total_amount: z.string(), // Changed to string
     deposit: z.string(), // Changed to string
+    balance_payment_method: z.string().optional(),
+    is_deposit_paid: z.boolean().optional(),
+    deposit_paid_date: z.date().optional(),
+    is_visited: z.boolean().optional(),
     notes: z.string().optional(),
     status: z.string().optional(),
 })
@@ -82,6 +87,10 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
             headcount: initialData?.headcount ? String(initialData.headcount) : "1",
             total_amount: initialData?.total_amount ? String(initialData.total_amount) : "0",
             deposit: initialData?.deposit ? String(initialData.deposit) : "0",
+            balance_payment_method: initialData?.balance_payment_method || "",
+            is_deposit_paid: initialData?.is_deposit_paid || false,
+            deposit_paid_date: initialData?.deposit_paid_date ? new Date(initialData.deposit_paid_date) : undefined,
+            is_visited: initialData?.is_visited || false,
             notes: initialData?.notes || "",
             accommodation_id: initialData?.accommodation_id || "",
             ticket_id: initialData?.ticket_id || "",
@@ -106,6 +115,10 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                 total_amount: Number(values.total_amount),
                 deposit: Number(values.deposit),
                 balance: balance,
+                balance_payment_method: values.balance_payment_method || null,
+                is_deposit_paid: values.is_deposit_paid || false,
+                deposit_paid_date: values.deposit_paid_date ? format(values.deposit_paid_date, "yyyy-MM-dd") : null,
+                is_visited: values.is_visited || false,
                 // Handle optional empty strings as null if needed, but Supabase handles empty string usually fine or as text. 
                 // For UUIDs (accommodation_id, ticket_id) empty string might fail if not nullable or foreign key constraint.
                 accommodation_id: values.accommodation_id === "" ? null : values.accommodation_id,
@@ -325,49 +338,181 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                 <FormField
                     control={form.control}
                     name="pickup_time"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>픽업 시간</FormLabel>
-                            <FormControl>
-                                <Input placeholder="예: 14:00" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
+                    render={({ field }) => {
+                        const val = field.value || ""
+                        const [hour, minute] = val.includes(":") ? val.split(":") : ["", ""]
+                        return (
+                            <FormItem>
+                                <FormLabel>픽업 시간</FormLabel>
+                                <div className="flex space-x-2">
+                                    <Select 
+                                        value={hour} 
+                                        onValueChange={(h) => field.onChange(`${h}:${minute || "00"}`)}
+                                    >
+                                        <FormControl>
+                                            <SelectTrigger><SelectValue placeholder="시" /></SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent className="max-h-56">
+                                            {Array.from({length: 24}).map((_, i) => {
+                                                const h = i.toString().padStart(2, '0')
+                                                return <SelectItem key={h} value={h}>{h}시</SelectItem>
+                                            })}
+                                        </SelectContent>
+                                    </Select>
+                                    <Select 
+                                        value={minute} 
+                                        onValueChange={(m) => field.onChange(`${hour || "15"}:${m}`)}
+                                    >
+                                        <FormControl>
+                                            <SelectTrigger><SelectValue placeholder="분" /></SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent className="max-h-56">
+                                            {["00", "10", "20", "30", "40", "50"].map((m) => (
+                                                <SelectItem key={m} value={m}>{m}분</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <FormMessage />
+                            </FormItem>
+                        )
+                    }}
                 />
 
-                <FormField
-                    control={form.control}
-                    name="total_amount"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>결재 금액</FormLabel>
-                            <FormControl>
-                                <Input type="number" placeholder="0" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
+                <div className="col-span-full border border-slate-200 bg-slate-50/50 rounded-md p-5 space-y-6 shadow-sm mt-4">
+                    <div className="flex justify-between items-center border-b border-slate-200 pb-3">
+                        <span className="text-slate-700 font-extrabold text-base">결제 및 요금 정보</span>
+                    </div>
 
-                <FormField
-                    control={form.control}
-                    name="deposit"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>예약금</FormLabel>
-                            <FormControl>
-                                <Input type="number" placeholder="0" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* 예약금 파트 */}
+                        <div className="space-y-4">
+                            <FormField
+                                control={form.control}
+                                name="total_amount"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="font-bold text-slate-700">총 결제 금액</FormLabel>
+                                        <FormControl>
+                                            <Input type="number" placeholder="0" className="bg-white font-bold" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
 
-                <div className="space-y-2">
-                    <FormLabel>차액 (자동 계산)</FormLabel>
-                    <div className="flex h-10 w-full rounded-md border border-input bg-muted px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50">
-                        {balance.toLocaleString()} 원
+                            <FormField
+                                control={form.control}
+                                name="deposit"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="font-bold text-slate-700">예약금</FormLabel>
+                                        <FormControl>
+                                            <Input type="number" placeholder="0" className="bg-white" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            
+                            <FormField
+                                control={form.control}
+                                name="is_deposit_paid"
+                                render={({ field }) => (
+                                    <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border bg-white p-3 shadow-sm mt-2">
+                                        <FormControl>
+                                            <Checkbox
+                                                checked={field.value}
+                                                onCheckedChange={(checked) => {
+                                                    field.onChange(checked)
+                                                    if (checked) {
+                                                        form.setValue("deposit_paid_date", new Date())
+                                                    } else {
+                                                        form.setValue("deposit_paid_date", undefined)
+                                                    }
+                                                }}
+                                                className="h-5 w-5 data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600"
+                                            />
+                                        </FormControl>
+                                        <FormLabel className="text-sm font-bold text-slate-700 cursor-pointer w-full">예약금 입금 완료</FormLabel>
+                                    </FormItem>
+                                )}
+                            />
+
+                            {form.watch("is_deposit_paid") && (
+                                <FormField
+                                    control={form.control}
+                                    name="deposit_paid_date"
+                                    render={({ field }) => (
+                                        <FormItem className="flex flex-col">
+                                            <FormLabel className="text-xs font-bold text-slate-600">입금 확인일 지정</FormLabel>
+                                            <Popover>
+                                                <PopoverTrigger asChild>
+                                                    <FormControl>
+                                                        <Button
+                                                            variant={"outline"}
+                                                            className={cn("w-full h-9 bg-white pl-3 text-left font-normal border-green-200 ring-offset-background", !field.value && "text-muted-foreground")}
+                                                        >
+                                                            {field.value ? format(field.value, "yyyy-MM-dd") : <span>날짜 선택</span>}
+                                                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50 text-green-700" />
+                                                        </Button>
+                                                    </FormControl>
+                                                </PopoverTrigger>
+                                                <PopoverContent className="w-auto p-0" align="start">
+                                                    <Calendar
+                                                        mode="single"
+                                                        locale={ko}
+                                                        selected={field.value}
+                                                        onSelect={(date) => field.onChange(date)}
+                                                        initialFocus
+                                                    />
+                                                </PopoverContent>
+                                            </Popover>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            )}
+                        </div>
+
+                        {/* 잔금 파트 */}
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <FormLabel className="font-bold text-red-600">차액 (잔금) 자동 계산</FormLabel>
+                                <div className="flex h-10 w-full rounded-md border border-red-200 bg-red-50 font-extrabold text-red-600 text-lg px-3 py-2 items-center justify-end shadow-sm">
+                                    {balance.toLocaleString()} 원
+                                </div>
+                            </div>
+
+                            {balance > 0 && (
+                                <FormField
+                                    control={form.control}
+                                    name="balance_payment_method"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel className="font-bold text-slate-700">차액 결제 수단 확정</FormLabel>
+                                            <Select 
+                                                onValueChange={(val) => field.onChange(val === "none" ? undefined : val)} 
+                                                defaultValue={field.value || "none"}
+                                            >
+                                                <FormControl>
+                                                    <SelectTrigger className="h-10 bg-white shadow-sm">
+                                                        <SelectValue placeholder="결제 수단 선택" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="none">미정 (현장결제 혹은 추후)</SelectItem>
+                                                    <SelectItem value="transfer">계좌이체</SelectItem>
+                                                    <SelectItem value="card">카드 결제</SelectItem>
+                                                    <SelectItem value="cash">현금 결제</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            )}
+                        </div>
                     </div>
                 </div>
 
