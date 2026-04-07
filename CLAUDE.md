@@ -1,20 +1,20 @@
 
-## Skill routing
+## 스킬 라우팅
 
-When the user's request matches an available skill, ALWAYS invoke it using the Skill
-tool as your FIRST action. Do NOT answer directly, do NOT use other tools first.
-The skill has specialized workflows that produce better results than ad-hoc answers.
+사용자의 요청이 사용 가능한 스킬과 일치하면, Skill 도구를 사용해 **항상 첫 번째 액션으로** 해당 스킬을 호출하세요.
+직접 답변하거나 다른 도구를 먼저 사용하지 마세요.
+스킬에는 직접 답변보다 더 나은 결과를 제공하는 전문화된 워크플로우가 있습니다.
 
-Key routing rules:
-- Product ideas, "is this worth building", brainstorming → invoke office-hours
-- Bugs, errors, "why is this broken", 500 errors → invoke investigate
-- Ship, deploy, push, create PR → invoke ship
-- QA, test the site, find bugs → invoke qa
-- Code review, check my diff → invoke review
-- Update docs after shipping → invoke document-release
-- Weekly retro → invoke retro
-- Design system, brand → invoke design-consultation
-- Visual audit, design polish → invoke design-review
-- Architecture review → invoke plan-eng-review
-- Save progress, checkpoint, resume → invoke checkpoint
-- Code quality, health check → invoke health
+주요 라우팅 규칙:
+- 제품 아이디어, "이게 만들 가치가 있나", 브레인스토밍 → office-hours 호출
+- 버그, 오류, "왜 이게 안 되지", 500 에러 → investigate 호출
+- 배포, 푸시, PR 생성 → ship 호출
+- QA, 사이트 테스트, 버그 찾기 → qa 호출
+- 코드 리뷰, diff 확인 → review 호출
+- 배포 후 문서 업데이트 → document-release 호출
+- 주간 회고 → retro 호출
+- 디자인 시스템, 브랜드 → design-consultation 호출
+- 시각적 감사, 디자인 다듬기 → design-review 호출
+- 아키텍처 리뷰 → plan-eng-review 호출
+- 진행 상황 저장, 체크포인트, 재개 → checkpoint 호출
+- 코드 품질, 헬스 체크 → health 호출
