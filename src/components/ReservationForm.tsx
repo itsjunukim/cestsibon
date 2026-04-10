@@ -24,7 +24,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { format } from "date-fns"
 import { ko } from "date-fns/locale"
 import { CalendarIcon } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, formatPhone } from "@/lib/utils"
 import { Textarea } from "@/components/ui/textarea"
 
 const formSchema = z.object({
@@ -79,7 +79,7 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
     const form = useForm<ReservationFormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: {
-            reservation_type: initialData?.reservation_type || "accommodation",
+            reservation_type: initialData?.reservation_type || "day",
             status: initialData?.status || "booked",
             customer_name: initialData?.customer_name || "",
             phone: initialData?.phone || "",
@@ -155,8 +155,10 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
 
     return (
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="col-span-full">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-1 lg:grid-cols-[1fr_400px] xl:grid-cols-[1.5fr_1fr] gap-8 w-full">
+                {/* Left Column - Reservation Data */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 content-start">
+                    <div className="col-span-full">
                     <FormField
                         control={form.control}
                         name="reservation_type"
@@ -247,7 +249,7 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                         <FormItem>
                             <FormLabel>전화번호</FormLabel>
                             <FormControl>
-                                <Input placeholder="010-0000-0000" {...field} />
+                                <Input placeholder="010-1234-5678" {...field} onChange={(e) => field.onChange(formatPhone(e.target.value))} />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -560,27 +562,33 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                         </div>
                     </div>
                 </div>
+                </div> {/* End Left Column */}
 
-                <div className="col-span-full">
+                {/* Right Column - Notes & Submit */}
+                <div className="flex flex-col h-full bg-slate-50 p-6 rounded-lg border border-slate-200 shadow-sm lg:sticky top-0">
                     <FormField
                         control={form.control}
                         name="notes"
                         render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>메모</FormLabel>
-                                <FormControl>
-                                    <Textarea placeholder="메모 사항 입력..." {...field} />
+                            <FormItem className="flex-1 flex flex-col mb-8">
+                                <FormLabel className="font-bold text-slate-800 text-base mb-2">메모</FormLabel>
+                                <FormControl className="flex-1 min-h-[300px]">
+                                    <Textarea 
+                                        className="resize-none h-full bg-white text-base shadow-inner border-slate-300 focus-visible:ring-indigo-500 p-4" 
+                                        placeholder="메모 사항 입력..." 
+                                        {...field} 
+                                    />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
                         )}
                     />
-                </div>
 
-                <Button type="submit" disabled={isLoading} className="col-span-full w-full">
-                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    {initialData ? "수정 완료" : "예약 생성"}
-                </Button>
+                    <Button type="submit" disabled={isLoading} className="w-full h-14 text-[18px] font-bold shadow-md hover:shadow-lg transition-all bg-indigo-600 hover:bg-indigo-700 text-white mt-auto">
+                        {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+                        {initialData ? "예약 정보 수정" : "새 예약 저장"}
+                    </Button>
+                </div>
             </form>
         </Form>
     )

@@ -40,6 +40,7 @@ import { useSearchParams } from "next/navigation"
 
 import { DateRange } from "react-day-picker"
 import { DateRangePicker } from "@/components/DateRangePicker"
+import { formatPhone } from "@/lib/utils"
 
 type SortConfig = {
     key: string
@@ -288,7 +289,7 @@ function ReservationsContent() {
             "유형": getTypeLabel(res.reservation_type),
             "날짜": format(new Date(res.date), "yyyy-MM-dd"),
             "예약자명": res.customer_name,
-            "전화번호": res.phone || "",
+            "전화번호": formatPhone(res.phone || ""),
             "인원": res.headcount,
             "숙소": res.accommodations?.name || "",
             "이용권": res.tickets?.name || "",
@@ -430,7 +431,7 @@ function ReservationsContent() {
                                 새 예약
                             </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" onInteractOutside={(e) => e.preventDefault()}>
+                        <DialogContent className="max-w-5xl xl:max-w-6xl w-[95vw] max-h-[90vh] overflow-y-auto" onInteractOutside={(e) => e.preventDefault()}>
                             <DialogHeader>
                                 <DialogTitle>{editingReservation ? "예약 수정" : "새 예약 생성"}</DialogTitle>
                             </DialogHeader>
@@ -541,7 +542,7 @@ function ReservationsContent() {
                                     {visibleColumns.customer && (
                                         <TableCell className="whitespace-nowrap">
                                             <div className="font-semibold">{res.customer_name}</div>
-                                            <div className="text-xs text-foreground font-medium mt-1">{res.phone || "-"}</div>
+                                            <div className="text-xs text-foreground font-medium mt-1">{formatPhone(res.phone || "") || "-"}</div>
                                         </TableCell>
                                     )}
                                     {visibleColumns.headcount && <TableCell>{res.headcount || 1}명</TableCell>}
@@ -658,7 +659,7 @@ function ReservationsContent() {
                                             <span className="text-sm font-normal text-muted-foreground">({res.headcount}명)</span>
                                         </CardTitle>
                                         <CardDescription className="mt-1 text-foreground font-medium">
-                                            {format(new Date(res.date), "yyyy-MM-dd")} • {res.phone || "연락처 없음"}
+                                            {format(new Date(res.date), "yyyy-MM-dd")} • {formatPhone(res.phone || "") || "연락처 없음"}
                                         </CardDescription>
                                     </div>
                                     <span className={`px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${res.status === 'completed' ? 'bg-green-100 text-green-700' :
