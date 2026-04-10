@@ -275,7 +275,7 @@ function ReservationsContent() {
     });
 
     // Helper to format currency
-    const fmtMoney = (amount: any) => Number(amount || 0).toLocaleString()
+    const fmtMoney = (amount: any) => Number(amount || 0).toLocaleString() + "원"
 
     const handleExportExcel = () => {
         if (!filteredReservations || filteredReservations.length === 0) {
@@ -430,7 +430,7 @@ function ReservationsContent() {
                                 새 예약
                             </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" onInteractOutside={(e) => e.preventDefault()}>
                             <DialogHeader>
                                 <DialogTitle>{editingReservation ? "예약 수정" : "새 예약 생성"}</DialogTitle>
                             </DialogHeader>

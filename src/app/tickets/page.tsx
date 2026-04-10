@@ -85,7 +85,7 @@ export default function TicketsPage() {
                             이용권 추가
                         </Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent onInteractOutside={(e) => e.preventDefault()}>
                         <DialogHeader>
                             <DialogTitle>{editingTicket ? "이용권 수정" : "새 이용권 추가"}</DialogTitle>
                         </DialogHeader>

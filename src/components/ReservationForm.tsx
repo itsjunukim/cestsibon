@@ -100,8 +100,8 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
     })
 
     // Calculate balance automatically
-    const totalAmount = Number(form.watch("total_amount") || 0)
-    const deposit = Number(form.watch("deposit") || 0)
+    const totalAmount = Number(String(form.watch("total_amount") || "0").replace(/[^0-9]/g, ''))
+    const deposit = Number(String(form.watch("deposit") || "0").replace(/[^0-9]/g, ''))
     const balance = totalAmount - deposit
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
@@ -112,8 +112,8 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                 date: format(values.date, "yyyy-MM-dd"),
                 // Convert strings back to numbers for DB
                 headcount: Number(values.headcount),
-                total_amount: Number(values.total_amount),
-                deposit: Number(values.deposit),
+                total_amount: Number(String(values.total_amount).replace(/[^0-9]/g, '')),
+                deposit: Number(String(values.deposit).replace(/[^0-9]/g, '')),
                 balance: balance,
                 balance_payment_method: values.balance_payment_method || null,
                 is_deposit_paid: values.is_deposit_paid || false,
@@ -392,9 +392,15 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                                 name="total_amount"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel className="font-bold text-slate-700">총 결제 금액</FormLabel>
+                                        <FormLabel className="font-bold text-slate-900 text-[14px]">총 결제 금액</FormLabel>
                                         <FormControl>
-                                            <Input type="number" placeholder="0" className="bg-white font-bold" {...field} />
+                                            <div className="relative flex items-center">
+                                                <Input type="text" placeholder="0" className="bg-slate-50 font-extrabold text-slate-900 text-[18px] md:text-[18px] h-12 pr-[34px] text-right border-slate-300 shadow-sm focus-visible:ring-slate-400" {...field} onChange={(e) => {
+                                                    const raw = e.target.value.replace(/[^0-9]/g, "");
+                                                    field.onChange(raw ? Number(raw).toLocaleString() : "");
+                                                }} value={field.value ? Number(String(field.value).replace(/[^0-9]/g, "")).toLocaleString() : ""} />
+                                                <span className="absolute right-3 text-slate-800 font-extrabold pointer-events-none text-[18px] md:text-[18px]">원</span>
+                                            </div>
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -408,7 +414,13 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                                     <FormItem>
                                         <FormLabel className="font-bold text-slate-700">예약금</FormLabel>
                                         <FormControl>
-                                            <Input type="number" placeholder="0" className="bg-white" {...field} />
+                                            <div className="relative flex items-center">
+                                                <Input type="text" placeholder="0" className="bg-white pr-8 text-right" {...field} onChange={(e) => {
+                                                    const raw = e.target.value.replace(/[^0-9]/g, "");
+                                                    field.onChange(raw ? Number(raw).toLocaleString() : "");
+                                                }} value={field.value ? Number(String(field.value).replace(/[^0-9]/g, "")).toLocaleString() : ""} />
+                                                <span className="absolute right-3 text-sm text-slate-500 font-bold pointer-events-none">원</span>
+                                            </div>
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -478,9 +490,10 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                         {/* 잔금 파트 */}
                         <div className="space-y-4">
                             <div className="space-y-2">
-                                <FormLabel className="font-bold text-red-600">차액 (잔금) 자동 계산</FormLabel>
-                                <div className="flex h-10 w-full rounded-md border border-red-200 bg-red-50 font-extrabold text-red-600 text-lg px-3 py-2 items-center justify-end shadow-sm">
-                                    {balance.toLocaleString()} 원
+                                <FormLabel className="font-bold text-red-600 text-[14px]">차액 (잔금) 자동 계산</FormLabel>
+                                <div className="relative flex h-12 w-full rounded-md border border-red-200 bg-red-50 font-extrabold text-red-600 text-[18px] md:text-[18px] pl-3 items-center justify-end shadow-sm">
+                                    <span className="pr-[34px] truncate">{balance.toLocaleString()}</span>
+                                    <span className="absolute right-3 pointer-events-none">원</span>
                                 </div>
                             </div>
 
@@ -512,6 +525,38 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                                     )}
                                 />
                             )}
+                        </div>
+                    </div>
+
+                    <div className="flex justify-center pt-4 border-t border-slate-200/80 mt-2">
+                        <div className="grid grid-cols-3 gap-2">
+                            {/* Plus Row */}
+                            <Button type="button" variant="outline" className="h-10 px-0 text-sm font-bold bg-white text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-300 w-24 shadow-sm" onClick={() => {
+                                const current = Number(form.getValues('total_amount')) || 0;
+                                form.setValue('total_amount', String(current + 1000));
+                            }}>+1,000원</Button>
+                            <Button type="button" variant="outline" className="h-10 px-0 text-sm font-bold bg-white text-orange-600 hover:text-orange-700 hover:bg-orange-50 border-orange-300 w-24 shadow-sm" onClick={() => {
+                                const current = Number(form.getValues('total_amount')) || 0;
+                                form.setValue('total_amount', String(current + 5000));
+                            }}>+5,000원</Button>
+                            <Button type="button" variant="outline" className="h-10 px-0 text-sm font-bold bg-white text-green-600 hover:text-green-700 hover:bg-green-50 border-green-300 w-24 shadow-sm" onClick={() => {
+                                const current = Number(form.getValues('total_amount')) || 0;
+                                form.setValue('total_amount', String(current + 10000));
+                            }}>+10,000원</Button>
+                            
+                            {/* Minus Row */}
+                            <Button type="button" variant="outline" className="h-10 px-0 text-sm font-bold bg-white text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-300 w-24 shadow-sm" onClick={() => {
+                                const current = Number(form.getValues('total_amount')) || 0;
+                                form.setValue('total_amount', String(Math.max(0, current - 1000)));
+                            }}>-1,000원</Button>
+                            <Button type="button" variant="outline" className="h-10 px-0 text-sm font-bold bg-white text-orange-600 hover:text-orange-700 hover:bg-orange-50 border-orange-300 w-24 shadow-sm" onClick={() => {
+                                const current = Number(form.getValues('total_amount')) || 0;
+                                form.setValue('total_amount', String(Math.max(0, current - 5000)));
+                            }}>-5,000원</Button>
+                            <Button type="button" variant="outline" className="h-10 px-0 text-sm font-bold bg-white text-green-600 hover:text-green-700 hover:bg-green-50 border-green-300 w-24 shadow-sm" onClick={() => {
+                                const current = Number(form.getValues('total_amount')) || 0;
+                                form.setValue('total_amount', String(Math.max(0, current - 10000)));
+                            }}>-10,000원</Button>
                         </div>
                     </div>
                 </div>

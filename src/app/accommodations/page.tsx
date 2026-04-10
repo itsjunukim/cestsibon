@@ -67,7 +67,7 @@ export default function AccommodationsPage() {
                             새 숙소 추가
                         </Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent onInteractOutside={(e) => e.preventDefault()}>
                         <DialogHeader>
                             <DialogTitle>{editingAccommodation ? "숙소 수정" : "새 숙소 추가"}</DialogTitle>
                         </DialogHeader>

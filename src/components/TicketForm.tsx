@@ -46,7 +46,7 @@ export function TicketForm({ onSuccess, initialData }: TicketFormProps) {
         try {
             const formattedValues = {
                 ...values,
-                price: Number(values.price)
+                price: Number(String(values.price).replace(/[^0-9]/g, ''))
             }
 
             let error;
@@ -103,7 +103,13 @@ export function TicketForm({ onSuccess, initialData }: TicketFormProps) {
                         <FormItem>
                             <FormLabel>가격 (KRW)</FormLabel>
                             <FormControl>
-                                <Input type="number" placeholder="50000" {...field} />
+                                <div className="relative flex items-center">
+                                    <Input type="text" placeholder="50,000" className="pr-8 text-right" {...field} onChange={(e) => {
+                                        const raw = e.target.value.replace(/[^0-9]/g, "");
+                                        field.onChange(raw ? Number(raw).toLocaleString() : "");
+                                    }} value={field.value ? Number(String(field.value).replace(/[^0-9]/g, "")).toLocaleString() : ""} />
+                                    <span className="absolute right-3 text-sm text-slate-500 font-bold pointer-events-none">원</span>
+                                </div>
                             </FormControl>
                             <FormMessage />
                         </FormItem>

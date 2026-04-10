@@ -1,0 +1,35 @@
+{
+  "date": "2026-04-07",
+  "window": "14d",
+  "metrics": {
+    "commits": 1,
+    "contributors": 1,
+    "prs_merged": 0,
+    "insertions": 934,
+    "deletions": 320,
+    "net_loc": 614,
+    "test_loc": 0,
+    "test_ratio": 0,
+    "active_days": 1,
+    "sessions": 1,
+    "deep_sessions": 1,
+    "avg_session_minutes": 0,
+    "loc_per_session_hour": 0,
+    "feat_pct": 1.0,
+    "fix_pct": 0.0,
+    "peak_hour": 19,
+    "ai_assisted_commits": 0
+  },
+  "authors": {
+    "itsjunukim": {
+      "commits": 1,
+      "insertions": 934,
+      "deletions": 320,
+      "test_ratio": 0,
+      "top_area": "src/app/reservations/"
+    }
+  },
+  "version_range": [],
+  "streak_days": 1,
+  "tweetable": "Week of Mar 29: 1 commit, +934/-320 LOC, Phase 4 & 4.5 완성 (퀵필터, 검색, PIN락)"
+}

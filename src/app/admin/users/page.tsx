@@ -119,7 +119,7 @@ export default function UserManagementPage() {
                             새 직원 등록
                         </Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent onInteractOutside={(e) => e.preventDefault()}>
                         <DialogHeader>
                             <DialogTitle>새 직원 계정 생성</DialogTitle>
                         </DialogHeader>
