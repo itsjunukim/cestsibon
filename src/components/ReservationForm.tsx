@@ -23,7 +23,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { format } from "date-fns"
 import { ko } from "date-fns/locale"
-import { CalendarIcon } from "lucide-react"
+import { CalendarIcon, X } from "lucide-react"
 import { cn, formatPhone } from "@/lib/utils"
 import { Textarea } from "@/components/ui/textarea"
 
@@ -33,7 +33,10 @@ const formSchema = z.object({
     phone: z.string().optional(),
     date: z.date(),
     headcount: z.string().min(1, "인원을 입력해주세요"), // Changed to string to avoid z.coerce issues
-    ticket_id: z.string().optional(),
+    selected_tickets: z.array(z.object({
+        ticket_id: z.string(),
+        quantity: z.number().min(1)
+    })).optional(),
     accommodation_id: z.string().optional(),
     pickup_location: z.string().optional(),
     pickup_time: z.string().optional(),
@@ -93,7 +96,12 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
             is_visited: initialData?.is_visited || false,
             notes: initialData?.notes || "",
             accommodation_id: initialData?.accommodation_id || "",
-            ticket_id: initialData?.ticket_id || "",
+            selected_tickets: initialData?.reservation_tickets 
+                ? initialData.reservation_tickets.map((rt: any) => ({
+                      ticket_id: rt.ticket_id,
+                      quantity: rt.quantity
+                  }))
+                : [],
             pickup_location: initialData?.pickup_location || "",
             pickup_time: initialData?.pickup_time || "",
         },
@@ -107,39 +115,56 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
     async function onSubmit(values: z.infer<typeof formSchema>) {
         setIsLoading(true)
         try {
+            const { selected_tickets, ...reservationData } = values;
+
             const formattedValues = {
-                ...values,
-                date: format(values.date, "yyyy-MM-dd"),
-                // Convert strings back to numbers for DB
-                headcount: Number(values.headcount),
-                total_amount: Number(String(values.total_amount).replace(/[^0-9]/g, '')),
-                deposit: Number(String(values.deposit).replace(/[^0-9]/g, '')),
+                ...reservationData,
+                date: format(reservationData.date, "yyyy-MM-dd"),
+                headcount: Number(reservationData.headcount),
+                total_amount: Number(String(reservationData.total_amount).replace(/[^0-9]/g, '')),
+                deposit: Number(String(reservationData.deposit).replace(/[^0-9]/g, '')),
                 balance: balance,
-                balance_payment_method: values.balance_payment_method || null,
-                is_deposit_paid: values.is_deposit_paid || false,
-                deposit_paid_date: values.deposit_paid_date ? format(values.deposit_paid_date, "yyyy-MM-dd") : null,
-                is_visited: values.is_visited || false,
-                // Handle optional empty strings as null if needed, but Supabase handles empty string usually fine or as text. 
-                // For UUIDs (accommodation_id, ticket_id) empty string might fail if not nullable or foreign key constraint.
-                accommodation_id: values.accommodation_id === "" ? null : values.accommodation_id,
-                ticket_id: values.ticket_id === "" ? null : values.ticket_id,
+                balance_payment_method: reservationData.balance_payment_method || null,
+                is_deposit_paid: reservationData.is_deposit_paid || false,
+                deposit_paid_date: reservationData.deposit_paid_date ? format(reservationData.deposit_paid_date, "yyyy-MM-dd") : null,
+                is_visited: reservationData.is_visited || false,
+                accommodation_id: reservationData.accommodation_id === "" ? null : reservationData.accommodation_id,
             }
 
             let error;
+            let currentReservationId = initialData?.id;
+
             if (initialData?.id) {
                 const { error: updateError } = await supabase
                     .from("reservations")
                     .update(formattedValues)
                     .eq("id", initialData.id)
-                error = updateError
+                error = updateError;
             } else {
-                const { error: insertError } = await supabase
+                const { data: insertedData, error: insertError } = await supabase
                     .from("reservations")
                     .insert([formattedValues])
-                error = insertError
+                    .select("id")
+                    .single()
+                
+                error = insertError;
+                currentReservationId = insertedData?.id;
             }
 
-            if (error) throw error
+            if (error) throw error;
+
+            if (currentReservationId) {
+                await supabase.from("reservation_tickets").delete().eq("reservation_id", currentReservationId);
+                const validTickets = (selected_tickets || []).filter(t => t.quantity > 0);
+                if (validTickets.length > 0) {
+                    const ticketInserts = validTickets.map(t => ({
+                        reservation_id: currentReservationId,
+                        ticket_id: t.ticket_id,
+                        quantity: t.quantity
+                    }));
+                    await supabase.from("reservation_tickets").insert(ticketInserts);
+                }
+            }
 
             alert(initialData ? "예약이 수정되었습니다." : "예약이 생성되었습니다.")
             queryClient.invalidateQueries({ queryKey: ["reservations"] })
@@ -298,30 +323,81 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                     )}
                 />
 
-                <FormField
-                    control={form.control}
-                    name="ticket_id"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>이용권 (선택)</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="이용권 선택" />
-                                    </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                    {tickets?.map((t: any) => (
+                <div className="col-span-full space-y-4">
+                    <div>
+                        <FormLabel className="mb-2 block">이용권</FormLabel>
+                        <Select onValueChange={(val) => {
+                            const st = form.getValues("selected_tickets") || [];
+                            if (val && !st.find(s => s.ticket_id === val)) {
+                                form.setValue("selected_tickets", [...st, { ticket_id: val, quantity: 1 }]);
+                                const t = tickets?.find((x: any) => x.id === val);
+                                if (t) {
+                                    const currentTotal = Number(String(form.getValues("total_amount")).replace(/[^0-9]/g, '')) || 0;
+                                    form.setValue("total_amount", String(currentTotal + Number(t.price)));
+                                }
+                            }
+                        }}>
+                            <SelectTrigger className="w-full md:w-1/2 bg-white">
+                                <SelectValue placeholder="추가할 이용권을 선택하세요..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {tickets?.map((t: any) => {
+                                    const isAdded = (form.watch("selected_tickets") || []).find(s => s.ticket_id === t.id);
+                                    if (isAdded) return null; // Hide already added tickets from dropdown
+                                    return (
                                         <SelectItem key={t.id} value={t.id}>
                                             {t.name} ({Number(t.price).toLocaleString()}원)
                                         </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
+                                    )
+                                })}
+                                {!tickets?.length && <div className="text-sm text-slate-500 py-2 px-2">등록된 이용권이 없습니다.</div>}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    {/* Selected Tickets Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                        {(form.watch("selected_tickets") || []).map((s: any) => {
+                            const t = tickets?.find((x: any) => x.id === s.ticket_id);
+                            if (!t) return null;
+                            const currentCount = s.quantity;
+
+                            return (
+                                <div key={t.id} className="relative flex items-center justify-between bg-white px-4 py-3 border border-slate-200 rounded-md shadow-sm border-l-4 border-l-orange-500">
+                                    <div className="font-semibold text-slate-800 text-sm">{t.name} <div className="text-orange-600 font-bold mt-0.5 text-xs">({Number(t.price).toLocaleString()}원)</div></div>
+                                    <div className="flex items-center space-x-2 bg-slate-50 border border-slate-200 rounded-md px-1 py-1 mr-6">
+                                        <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-slate-700 hover:bg-slate-200 rounded" onClick={() => {
+                                            if (currentCount > 1) { 
+                                                const st = form.getValues("selected_tickets") || [];
+                                                const newArr = st.map(x => x.ticket_id === t.id ? { ...x, quantity: x.quantity - 1 } : x);
+                                                form.setValue("selected_tickets", newArr);
+                                                const currentTotal = Number(String(form.getValues("total_amount")).replace(/[^0-9]/g, '')) || 0;
+                                                form.setValue("total_amount", String(Math.max(0, currentTotal - Number(t.price))));
+                                            }
+                                        }}>-</Button>
+                                        <span className="w-6 text-center font-extrabold text-slate-900 text-sm">{currentCount}</span>
+                                        <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-slate-700 hover:bg-slate-200 rounded" onClick={() => {
+                                            const st = form.getValues("selected_tickets") || [];
+                                            const newArr = st.map(x => x.ticket_id === t.id ? { ...x, quantity: x.quantity + 1 } : x);
+                                            form.setValue("selected_tickets", newArr);
+                                            const currentTotal = Number(String(form.getValues("total_amount")).replace(/[^0-9]/g, '')) || 0;
+                                            form.setValue("total_amount", String(currentTotal + Number(t.price)));
+                                        }}>+</Button>
+                                    </div>
+                                    <Button type="button" variant="ghost" size="icon" title="삭제" className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors" onClick={() => {
+                                        const st = form.getValues("selected_tickets") || [];
+                                        form.setValue("selected_tickets", st.filter(x => x.ticket_id !== t.id));
+                                        const priceToDeduct = Number(t.price) * currentCount;
+                                        const currentTotal = Number(String(form.getValues("total_amount")).replace(/[^0-9]/g, '')) || 0;
+                                        form.setValue("total_amount", String(Math.max(0, currentTotal - priceToDeduct)));
+                                    }}>
+                                        <X className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            )
+                        })}
+                    </div>
+                </div>
 
                 <FormField
                     control={form.control}

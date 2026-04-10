@@ -135,7 +135,7 @@ function ReservationsContent() {
         queryFn: async () => {
             let query = supabase
                 .from("reservations")
-                .select("*, accommodations(name), tickets(name)")
+                .select("*, accommodations(name), reservation_tickets(ticket_id, quantity, tickets(name))")
 
             if (dateRange?.from) {
                 const fromStr = format(dateRange.from, "yyyy-MM-dd")
@@ -292,7 +292,7 @@ function ReservationsContent() {
             "전화번호": formatPhone(res.phone || ""),
             "인원": res.headcount,
             "숙소": res.accommodations?.name || "",
-            "이용권": res.tickets?.name || "",
+            "이용권": (res.reservation_tickets || []).map((rt: any) => `${rt.tickets?.name}(${rt.quantity})`).join(", ") || "",
             "픽업위치": res.pickup_location || "",
             "픽업시간": res.pickup_time || "",
             "총액": Number(res.total_amount || 0),
@@ -552,8 +552,16 @@ function ReservationsContent() {
                                         </TableCell>
                                     )}
                                     {visibleColumns.ticket && (
-                                        <TableCell className="whitespace-nowrap">
-                                            {res.tickets?.name ? <span className="font-medium text-orange-600">🎫 {res.tickets.name}</span> : "-"}
+                                        <TableCell className="max-w-[200px]">
+                                            {res.reservation_tickets?.length > 0 ? (
+                                                <div className="flex flex-wrap gap-1">
+                                                    {res.reservation_tickets.map((rt: any, idx: number) => (
+                                                        <span key={idx} className="font-medium text-orange-700 text-[11px] bg-orange-50 px-1.5 py-0.5 rounded border border-orange-100 whitespace-nowrap">
+                                                            🎫 {rt.tickets?.name}({rt.quantity})
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            ) : "-"}
                                         </TableCell>
                                     )}
                                     {visibleColumns.pickup && (
@@ -680,10 +688,16 @@ function ReservationsContent() {
                                             <span className="font-medium text-indigo-700">🏠 {res.accommodations.name}</span>
                                         </div>
                                     )}
-                                    {res.tickets?.name && (
-                                        <div className="col-span-2 flex items-center gap-2">
-                                            <span className="text-muted-foreground w-12 shrink-0">이용권</span>
-                                            <span className="font-medium text-orange-700">🎫 {res.tickets.name}</span>
+                                    {res.reservation_tickets?.length > 0 && (
+                                        <div className="col-span-2 flex items-start gap-2">
+                                            <span className="text-muted-foreground w-12 shrink-0 pt-0.5">이용권</span>
+                                            <div className="flex flex-wrap gap-1">
+                                                {res.reservation_tickets.map((rt: any, idx: number) => (
+                                                    <span key={idx} className="font-medium text-orange-700 text-xs bg-orange-50 px-1.5 py-0.5 rounded-sm border border-orange-100">
+                                                        🎫 {rt.tickets?.name}({rt.quantity})
+                                                    </span>
+                                                ))}
+                                            </div>
                                         </div>
                                     )}
                                     <div className="flex items-center gap-2">

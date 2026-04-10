@@ -41,7 +41,7 @@ export default function TicketsPage() {
             const { data, error } = await supabase
                 .from("tickets")
                 .select("*")
-                .order("created_at", { ascending: false })
+                .order("name", { ascending: true })
 
             if (error) {
                 console.warn(error)
@@ -122,7 +122,7 @@ export default function TicketsPage() {
                             ) : tickets?.map((ticket: any) => (
                                 <TableRow key={ticket.id}>
                                     <TableCell className="font-medium">{ticket.name}</TableCell>
-                                    <TableCell className="text-right">₩{Number(ticket.price).toLocaleString()}</TableCell>
+                                    <TableCell className="text-right">{Number(ticket.price).toLocaleString()}원</TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex justify-end gap-2">
                                             <Button variant="ghost" size="icon" onClick={() => openEditDialog(ticket)}>
