@@ -201,6 +201,7 @@ export default function UserManagementPage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <TableHead className="w-12 text-center">No.</TableHead>
                                 <TableHead>이메일</TableHead>
                                 <TableHead>이름</TableHead>
                                 <TableHead>전화번호</TableHead>
@@ -212,19 +213,20 @@ export default function UserManagementPage() {
                         <TableBody>
                             {isLoading ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="text-center py-8">
+                                    <TableCell colSpan={7} className="text-center py-8">
                                         불러오는 중...
                                     </TableCell>
                                 </TableRow>
                             ) : profiles?.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                                         등록된 계정이 없습니다. (setup_roles.sql을 실행했는지 확인해주세요)
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                profiles?.map((profile: any) => (
+                                profiles?.map((profile: any, index: number) => (
                                     <TableRow key={profile.id}>
+                                        <TableCell className="text-center font-medium text-muted-foreground">{index + 1}</TableCell>
                                         <TableCell className="font-medium">{profile.email}</TableCell>
                                         <TableCell>{profile.name || "-"}</TableCell>
                                         <TableCell>{profile.phone || "-"}</TableCell>

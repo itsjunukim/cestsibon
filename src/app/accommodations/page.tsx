@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/table"
 import { Plus, Pencil, Trash2 } from "lucide-react"
 import { AccommodationForm } from "@/components/AccommodationForm"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase"
 import { useState } from "react"
 
@@ -32,6 +32,7 @@ export default function AccommodationsPage() {
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [editingAccommodation, setEditingAccommodation] = useState<any>(null)
     const supabase = createClient()
+    const queryClient = useQueryClient()
 
     const { data: accommodations, isLoading } = useQuery({
         queryKey: ["accommodations"],
@@ -87,6 +88,7 @@ export default function AccommodationsPage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <TableHead className="w-12 text-center">No.</TableHead>
                                 <TableHead>이름</TableHead>
                                 <TableHead>방 종류</TableHead>
                                 <TableHead>연락처</TableHead>
@@ -97,19 +99,20 @@ export default function AccommodationsPage() {
                         <TableBody>
                             {isLoading ? (
                                 <TableRow>
-                                    <TableCell colSpan={5} className="text-center py-10">
+                                    <TableCell colSpan={6} className="text-center py-10">
                                         불러오는 중...
                                     </TableCell>
                                 </TableRow>
                             ) : accommodations?.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={5} className="text-center py-10">
+                                    <TableCell colSpan={6} className="text-center py-10">
                                         등록된 숙소가 없습니다.
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                accommodations?.map((acc: any) => (
+                                accommodations?.map((acc: any, index: number) => (
                                     <TableRow key={acc.id}>
+                                        <TableCell className="text-center font-medium text-muted-foreground">{index + 1}</TableCell>
                                         <TableCell className="font-medium">{acc.name}</TableCell>
                                         <TableCell>
                                             {acc.rooms && acc.rooms.length > 0 ? (
@@ -143,21 +146,18 @@ export default function AccommodationsPage() {
                                                     variant="ghost"
                                                     size="icon"
                                                     title="삭제"
-                                                    onClick={() => {
+                                                    onClick={async () => {
                                                         if (confirm('정말 삭제하시겠습니까?')) {
-                                                            // Handle delete logic here or pass a handler
-                                                            const deleteAccommodation = async () => {
-                                                                const { error } = await supabase
-                                                                    .from('accommodations')
-                                                                    .delete()
-                                                                    .eq('id', acc.id)
-
-                                                                if (!error) {
-                                                                    // Invalidate queries if we had access to queryClient here or just reload
-                                                                    window.location.reload()
-                                                                }
+                                                            const { error } = await supabase
+                                                                .from('accommodations')
+                                                                .delete()
+                                                                .eq('id', acc.id)
+                                                            if (error) {
+                                                                console.error(error)
+                                                                alert('삭제에 실패했습니다.')
+                                                            } else {
+                                                                queryClient.invalidateQueries({ queryKey: ['accommodations'] })
                                                             }
-                                                            deleteAccommodation()
                                                         }
                                                     }}
                                                 >

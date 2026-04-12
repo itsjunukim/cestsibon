@@ -135,7 +135,7 @@ function ReservationsContent() {
         queryFn: async () => {
             let query = supabase
                 .from("reservations")
-                .select("*, accommodations(name), reservation_tickets(ticket_id, quantity, tickets(name))")
+                .select("*, accommodations(name), rooms(name), reservation_tickets(ticket_id, quantity, tickets(name))")
 
             if (dateRange?.from) {
                 const fromStr = format(dateRange.from, "yyyy-MM-dd")
@@ -284,48 +284,51 @@ function ReservationsContent() {
             return
         }
 
-        // Format data for Excel
+        // Format data for Excel (A4 세로 출력 최적화 컬럼 순서)
         const excelData = filteredReservations.map((res: any) => ({
-            "유형": getTypeLabel(res.reservation_type),
-            "날짜": format(new Date(res.date), "yyyy-MM-dd"),
             "예약자명": res.customer_name,
             "전화번호": formatPhone(res.phone || ""),
             "인원": res.headcount,
-            "숙소": res.accommodations?.name || "",
             "이용권": (res.reservation_tickets || []).map((rt: any) => `${rt.tickets?.name}(${rt.quantity})`).join(", ") || "",
-            "픽업위치": res.pickup_location || "",
-            "픽업시간": res.pickup_time || "",
-            "총액": Number(res.total_amount || 0),
+            "숙박": res.accommodations?.name ? `${res.accommodations.name}${res.rooms?.name ? ` (${res.rooms.name})` : ""}` : "",
             "예약금": Number(res.deposit || 0),
-            "잔금": Number(res.balance || 0),
-            "메모": res.notes || "",
-            "상태": res.status === 'booked' ? '예약됨' :
-                res.status === 'completed' ? '완료' :
-                    res.status === 'cancelled' ? '취소됨' : res.status
+            "픽업위치": res.pickup_location || "",
+            "시간": res.pickup_time || "",
+            "총 결제금액": Number(res.total_amount || 0),
         }))
 
         // Create workbook and worksheet
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.json_to_sheet(excelData);
 
-        // Adjust column widths (optional)
-        const wscols = [
-            { wch: 10 }, // 유형
-            { wch: 12 }, // 날짜
-            { wch: 10 }, // 예약자명
-            { wch: 15 }, // 전화번호
-            { wch: 6 },  // 인원
-            { wch: 20 }, // 숙소
-            { wch: 20 }, // 이용권
-            { wch: 15 }, // 픽업위치
-            { wch: 10 }, // 픽업시간
-            { wch: 10 }, // 총액
-            { wch: 10 }, // 예약금
-            { wch: 10 }, // 잔금
-            { wch: 30 }, // 메모
-            { wch: 10 }, // 상태
+        // A4 세로 출력에 맞춘 컬럼 너비
+        ws['!cols'] = [
+            { wch: 12 }, // 예약자명
+            { wch: 16 }, // 전화번호
+            { wch: 6  }, // 인원
+            { wch: 22 }, // 이용권
+            { wch: 18 }, // 숙박
+            { wch: 12 }, // 예약금
+            { wch: 16 }, // 픽업위치
+            { wch: 8  }, // 시간
+            { wch: 14 }, // 총 결제금액
         ];
-        ws['!cols'] = wscols;
+
+        // A4 세로 인쇄 설정
+        ws['!pageSetup'] = {
+            paperSize: 9,        // A4
+            orientation: 'portrait',
+            fitToPage: true,
+            fitToWidth: 1,
+            fitToHeight: 0,
+        };
+
+        // 인쇄 여백 (인치 단위)
+        ws['!margins'] = {
+            left: 0.5, right: 0.5,
+            top: 0.75, bottom: 0.75,
+            header: 0.3, footer: 0.3,
+        };
 
         XLSX.utils.book_append_sheet(wb, ws, "예약목록");
 
@@ -548,7 +551,11 @@ function ReservationsContent() {
                                     {visibleColumns.headcount && <TableCell>{res.headcount || 1}명</TableCell>}
                                     {visibleColumns.accommodation && (
                                         <TableCell className="whitespace-nowrap">
-                                            {res.accommodations?.name ? <span className="font-medium text-indigo-600">🏠 {res.accommodations.name}</span> : "-"}
+                                            {res.accommodations?.name ? (
+                                                <span className="font-medium text-indigo-600">
+                                                    🏠 {res.accommodations.name}{res.rooms?.name ? ` (${res.rooms.name})` : ""}
+                                                </span>
+                                            ) : "-"}
                                         </TableCell>
                                     )}
                                     {visibleColumns.ticket && (
@@ -685,7 +692,7 @@ function ReservationsContent() {
                                     {res.accommodations?.name && (
                                         <div className="col-span-2 flex items-center gap-2">
                                             <span className="text-muted-foreground w-12 shrink-0">숙소</span>
-                                            <span className="font-medium text-indigo-700">🏠 {res.accommodations.name}</span>
+                                            <span className="font-medium text-indigo-700">🏠 {res.accommodations.name}{res.rooms?.name ? ` (${res.rooms.name})` : ""}</span>
                                         </div>
                                     )}
                                     {res.reservation_tickets?.length > 0 && (

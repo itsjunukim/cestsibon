@@ -18,14 +18,6 @@ import { createClient } from "@/lib/supabase"
 import { useQueryClient } from "@tanstack/react-query"
 import { Loader2, Plus, Trash2 } from "lucide-react"
 import { useState } from "react"
-import { toast } from "sonner"
-
-// Fallback for toast if not installed
-const showToast = (message: string) => {
-    // In a real app we would use sonner/toast
-    console.log(message)
-    // alert(message) // suppressing alert for smoother UX
-}
 
 const formSchema = z.object({
     name: z.string().min(2, {
@@ -126,7 +118,7 @@ export function AccommodationForm({ onSuccess, initialData }: AccommodationFormP
 
                 if (roomError) {
                     console.error("Error saving rooms:", roomError)
-                    showToast("Warning: Accommodation saved but rooms failed to save.")
+                    alert("Warning: Accommodation saved but rooms failed to save.")
                 }
             } else if (initialData?.id && (!rooms || rooms.length === 0) && accId) {
                 // If editing and no rooms provided (all removed), we should clear existing rooms
@@ -140,13 +132,13 @@ export function AccommodationForm({ onSuccess, initialData }: AccommodationFormP
                 }
             }
 
-            showToast("Accommodation saved successfully")
+            alert("Accommodation saved successfully")
             queryClient.invalidateQueries({ queryKey: ["accommodations"] })
             onSuccess?.()
             form.reset()
         } catch (error) {
             console.error(error)
-            showToast("Failed to save accommodation")
+            alert("Failed to save accommodation")
         } finally {
             setIsLoading(false)
         }
@@ -188,8 +180,7 @@ export function AccommodationForm({ onSuccess, initialData }: AccommodationFormP
                         <FormItem>
                             <FormLabel>상세 정보</FormLabel>
                             <FormControl>
-                                <textarea
-                                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                <Textarea
                                     placeholder="상세 내용을 입력하세요..."
                                     {...field}
                                 />

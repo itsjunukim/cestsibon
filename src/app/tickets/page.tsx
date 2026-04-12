@@ -105,6 +105,7 @@ export default function TicketsPage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <TableHead className="w-12 text-center">No.</TableHead>
                                 <TableHead>이용권 명칭</TableHead>
                                 <TableHead className="text-right">가격</TableHead>
                                 <TableHead className="text-right">관리</TableHead>
@@ -113,14 +114,15 @@ export default function TicketsPage() {
                         <TableBody>
                             {isLoading ? (
                                 <TableRow>
-                                    <TableCell colSpan={3} className="text-center">Loading...</TableCell>
+                                    <TableCell colSpan={4} className="text-center">Loading...</TableCell>
                                 </TableRow>
                             ) : tickets?.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">이용권이 없습니다.</TableCell>
+                                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">이용권이 없습니다.</TableCell>
                                 </TableRow>
-                            ) : tickets?.map((ticket: any) => (
+                            ) : tickets?.map((ticket: any, index: number) => (
                                 <TableRow key={ticket.id}>
+                                    <TableCell className="text-center font-medium text-muted-foreground">{index + 1}</TableCell>
                                     <TableCell className="font-medium">{ticket.name}</TableCell>
                                     <TableCell className="text-right">{Number(ticket.price).toLocaleString()}원</TableCell>
                                     <TableCell className="text-right">

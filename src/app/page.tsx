@@ -7,10 +7,10 @@ import { useQuery } from "@tanstack/react-query"
 import { StatsChart } from "@/components/StatsChart"
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns"
 import { ko } from "date-fns/locale"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { PinUnlockDialog } from "@/components/PinUnlockDialog"
 
 type ViewMode = 'daily' | 'weekly' | 'monthly'
@@ -25,13 +25,17 @@ export default function DashboardPage() {
   const supabase = createClient()
   const router = useRouter()
 
+  // 다른 페이지에서 홈으로 돌아올 때 잠금 초기화
+  const pathname = usePathname()
+  const prevPathRef = useRef(pathname)
   useEffect(() => {
-    const unlocked = sessionStorage.getItem('dashboard_unlocked') === 'true'
-    setIsUnlocked(unlocked)
-  }, [])
+    if (prevPathRef.current !== '/' && pathname === '/') {
+      setIsUnlocked(false)
+    }
+    prevPathRef.current = pathname
+  }, [pathname])
 
   const handleUnlockSuccess = () => {
-    sessionStorage.setItem('dashboard_unlocked', 'true')
     setIsUnlocked(true)
     setIsPinDialogOpen(false)
   }
@@ -149,7 +153,7 @@ export default function DashboardPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 animate-fade-up">
         <div>
           <h1 className="text-3xl font-bold text-primary">
-            영업 현황 (홈)
+            영업 현황 대시보드
           </h1>
           <p className="text-sm text-muted-foreground">{label} 현황</p>
         </div>
@@ -271,30 +275,29 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-1 animate-fade-up delay-200">
-        <Card className="col-span-4 border-none shadow-md hover-lift transition-all duration-300 relative">
-          <div className={cn("transition-all duration-300 h-full", !isUnlocked && "blur-md select-none opacity-30 pointer-events-none")}>
+        {isUnlocked ? (
+          <Card className="col-span-4 border-none shadow-md hover-lift transition-all duration-300">
             <CardHeader>
               <CardTitle>매출 추이</CardTitle>
             </CardHeader>
-            <CardContent className="pl-2 relative">
+            <CardContent className="pl-2">
               <StatsChart
                 data={finalStats.chartData}
                 onBarClick={handleChartClick}
               />
             </CardContent>
-          </div>
-          {!isUnlocked && (
-            <div 
-              className="absolute inset-0 z-10 flex items-center justify-center cursor-pointer hover:bg-muted/10 transition-colors rounded-xl"
-              onClick={() => setIsPinDialogOpen(true)}
-            >
-              <div className="bg-background/80 backdrop-blur-sm px-4 py-2 rounded-full border shadow-sm flex items-center gap-2 text-foreground">
-                <Lock className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm font-medium text-muted-foreground">잠금 해제</span>
-              </div>
+          </Card>
+        ) : (
+          <div
+            className="flex items-center justify-center h-80 bg-slate-100 rounded-xl cursor-pointer border border-slate-200"
+            onClick={() => setIsPinDialogOpen(true)}
+          >
+            <div className="bg-white px-5 py-3 rounded-full border shadow-md flex items-center gap-2">
+              <Lock className="w-5 h-5 text-slate-700" />
+              <span className="text-sm font-bold text-slate-700">잠금 해제</span>
             </div>
-          )}
-        </Card>
+          </div>
+        )}
       </div>
 
       <PinUnlockDialog 

@@ -18,7 +18,7 @@ import { createClient } from "@/lib/supabase"
 import { useQueryClient, useQuery } from "@tanstack/react-query"
 import { Loader2 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { format } from "date-fns"
@@ -38,6 +38,7 @@ const formSchema = z.object({
         quantity: z.number().min(1)
     })).optional(),
     accommodation_id: z.string().optional(),
+    room_id: z.string().optional(),
     pickup_location: z.string().optional(),
     pickup_time: z.string().optional(),
     total_amount: z.string(), // Changed to string
@@ -96,6 +97,7 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
             is_visited: initialData?.is_visited || false,
             notes: initialData?.notes || "",
             accommodation_id: initialData?.accommodation_id || "",
+            room_id: initialData?.room_id || "",
             selected_tickets: initialData?.reservation_tickets 
                 ? initialData.reservation_tickets.map((rt: any) => ({
                       ticket_id: rt.ticket_id,
@@ -106,6 +108,23 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
             pickup_time: initialData?.pickup_time || "",
         },
     })
+
+    const selectedAccommodationId = form.watch("accommodation_id")
+
+    const { data: rooms } = useQuery({
+        queryKey: ["rooms", selectedAccommodationId],
+        queryFn: async () => {
+            if (!selectedAccommodationId) return []
+            const { data } = await supabase.from("rooms").select("id, name").eq("accommodation_id", selectedAccommodationId).order("name")
+            return data || []
+        },
+        enabled: !!selectedAccommodationId,
+    })
+
+    // 숙소가 바뀌면 방 선택 초기화
+    useEffect(() => {
+        form.setValue("room_id", "")
+    }, [selectedAccommodationId])
 
     // Calculate balance automatically
     const totalAmount = Number(String(form.watch("total_amount") || "0").replace(/[^0-9]/g, ''))
@@ -129,6 +148,7 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                 deposit_paid_date: reservationData.deposit_paid_date ? format(reservationData.deposit_paid_date, "yyyy-MM-dd") : null,
                 is_visited: reservationData.is_visited || false,
                 accommodation_id: reservationData.accommodation_id === "" ? null : reservationData.accommodation_id,
+                room_id: reservationData.room_id === "" ? null : reservationData.room_id,
             }
 
             let error;
@@ -295,19 +315,24 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                     )}
                 />
 
+                {form.watch("reservation_type") === "accommodation" && (
                 <FormField
                     control={form.control}
                     name="accommodation_id"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>숙소 (선택)</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormLabel>숙소</FormLabel>
+                            <Select
+                                onValueChange={(val) => field.onChange(val === "__none__" ? "" : val)}
+                                value={field.value || ""}
+                            >
                                 <FormControl>
                                     <SelectTrigger>
                                         <SelectValue placeholder="숙소 선택" />
                                     </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
+                                    <SelectItem value="__none__">선택 안함</SelectItem>
                                     {accommodations?.map((acc: any) => (
                                         <SelectItem key={acc.id} value={acc.id}>
                                             {acc.name}
@@ -322,6 +347,43 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                         </FormItem>
                     )}
                 />
+                )}
+
+                {form.watch("reservation_type") === "accommodation" && (
+                <FormField
+                    control={form.control}
+                    name="room_id"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>방 종류</FormLabel>
+                            <Select
+                                onValueChange={(val) => field.onChange(val === "__none__" ? "" : val)}
+                                value={field.value || ""}
+                                disabled={!selectedAccommodationId}
+                            >
+                                <FormControl>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder={selectedAccommodationId ? "방 종류 선택" : "숙소를 먼저 선택하세요"} />
+                                    </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    <SelectItem value="__none__">선택 안함</SelectItem>
+                                    {rooms && rooms.length > 0 ? (
+                                        rooms.map((room: any) => (
+                                            <SelectItem key={room.id} value={room.id}>
+                                                {room.name}
+                                            </SelectItem>
+                                        ))
+                                    ) : (
+                                        <div className="text-sm text-slate-500 py-2 px-2">등록된 방이 없습니다.</div>
+                                    )}
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                )}
 
                 <div className="col-span-full space-y-4">
                     <div>
