@@ -1,4 +1,3 @@
-
 ## 스킬 라우팅
 
 사용자의 요청이 사용 가능한 스킬과 일치하면, Skill 도구를 사용해 **항상 첫 번째 액션으로** 해당 스킬을 호출하세요.
@@ -18,3 +17,25 @@
 - 아키텍처 리뷰 → plan-eng-review 호출
 - 진행 상황 저장, 체크포인트, 재개 → checkpoint 호출
 - 코드 품질, 헬스 체크 → health 호출
+
+## 문서 업데이트 규칙
+
+**모든 기능 수정/추가 후 반드시 docs/ 파일 업데이트 필수**
+
+| 변경 사항 | 업데이트 파일 |
+|----------|----------|
+| 새 페이지/기능 추가 | FEATURES.md, USER_GUIDE.md |
+| 기능 수정/개선 | FEATURES.md, USER_GUIDE.md |
+| DB 스키마 변경 | API_REFERENCE.md, FEATURES.md |
+| 관리자 기능 변경 | ADMIN_GUIDE.md |
+| 새로운 에러/문제 | TROUBLESHOOTING.md |
+
+**커밋 규칙**:
+```
+git add docs/
+git commit -m "feat: 기능 설명
+
+docs: FEATURES.md, USER_GUIDE.md 업데이트"
+```
+
+**작성 규칙**: 한글 베이스, 목차/단계별 지침/예시 포함
