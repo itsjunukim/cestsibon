@@ -720,16 +720,16 @@ function ReservationsContent() {
                                 <div className="space-y-1">
                                     <div className="flex justify-between">
                                         <span className="text-foreground font-medium">총액</span>
-                                        <span className="font-bold">{fmtMoney(res.total_amount)}원</span>
+                                        <span className="font-bold">{fmtMoney(res.total_amount)}</span>
                                     </div>
                                     <div className="flex justify-between text-xs mt-1">
                                         <span className="text-foreground font-medium">예약금</span>
-                                        <span className="font-medium">{fmtMoney(res.deposit)}원</span>
+                                        <span className="font-medium">{fmtMoney(res.deposit)}</span>
                                     </div>
                                     {Number(res.balance) > 0 &&
                                         <div className="flex justify-between text-red-600 font-bold">
                                             <span>잔금</span>
-                                            <span>{fmtMoney(res.balance)}원</span>
+                                            <span>{fmtMoney(res.balance)}</span>
                                         </div>
                                     }
                                 </div>
