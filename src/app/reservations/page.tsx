@@ -346,8 +346,8 @@ function ReservationsContent() {
                     예약 관리
                 </h1>
 
-                <div className="flex flex-wrap items-center gap-3 mt-4 md:mt-0">
-                    <div className="relative w-full md:w-56 lg:w-64 max-w-sm">
+                <div className="flex flex-wrap items-center gap-3 mt-4 md:mt-0 w-full md:w-auto">
+                    <div className="relative w-full md:w-56 lg:w-64">
                         <Search className="absolute left-2.5 top-[8.5px] h-4 w-4 text-muted-foreground" />
                         <Input
                             type="text"
@@ -358,10 +358,10 @@ function ReservationsContent() {
                         />
                     </div>
 
-                    <div className="flex items-center space-x-1 border bg-slate-100/80 rounded-md p-1 shadow-sm h-9">
-                        <Button variant="ghost" size="sm" onClick={setToday} className="h-7 text-xs px-2.5 font-semibold hover:bg-white text-slate-700">오늘</Button>
-                        <Button variant="ghost" size="sm" onClick={setThisWeek} className="h-7 text-xs px-2.5 font-semibold hover:bg-white text-slate-700">이번주</Button>
-                        <Button variant="ghost" size="sm" onClick={setThisMonth} className="h-7 text-xs px-2.5 font-semibold hover:bg-white text-slate-700">이번달</Button>
+                    <div className="flex items-center space-x-1 border bg-slate-100/80 rounded-md p-1 shadow-sm h-9 w-full md:w-auto">
+                        <Button variant="ghost" size="sm" onClick={setToday} className="flex-1 md:flex-none h-7 text-xs px-2.5 font-semibold hover:bg-white text-slate-700">오늘</Button>
+                        <Button variant="ghost" size="sm" onClick={setThisWeek} className="flex-1 md:flex-none h-7 text-xs px-2.5 font-semibold hover:bg-white text-slate-700">이번주</Button>
+                        <Button variant="ghost" size="sm" onClick={setThisMonth} className="flex-1 md:flex-none h-7 text-xs px-2.5 font-semibold hover:bg-white text-slate-700">이번달</Button>
                     </div>
 
                     <DateRangePicker
@@ -429,7 +429,7 @@ function ReservationsContent() {
 
                     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                         <DialogTrigger asChild>
-                            <Button onClick={openCreateDialog}>
+                            <Button onClick={openCreateDialog} className="w-full md:w-auto">
                                 <Plus className="mr-2 h-4 w-4" />
                                 새 예약
                             </Button>

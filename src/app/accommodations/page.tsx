@@ -80,6 +80,7 @@ export default function AccommodationsPage() {
                 </Dialog>
             </div>
 
+            <div className="hidden md:block">
             <Card>
                 <CardHeader>
                     <CardTitle>숙소 목록</CardTitle>
@@ -172,6 +173,50 @@ export default function AccommodationsPage() {
                     </Table>
                 </CardContent>
             </Card>
+            </div>
+
+            {/* Mobile View */}
+            <div className="md:hidden space-y-3">
+                {isLoading ? (
+                    <div className="text-center py-10">불러오는 중...</div>
+                ) : accommodations?.length === 0 ? (
+                    <div className="text-center py-10 text-muted-foreground">등록된 숙소가 없습니다.</div>
+                ) : accommodations?.map((acc: any) => (
+                    <Card key={acc.id}>
+                        <CardContent className="p-4">
+                            <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                    <h3 className="font-bold text-base">{acc.name}</h3>
+                                    {acc.contact && <p className="text-sm text-muted-foreground mt-1">📞 {acc.contact}</p>}
+                                    {acc.details && <p className="text-sm text-muted-foreground">{acc.details}</p>}
+                                    {acc.rooms && acc.rooms.length > 0 && (
+                                        <div className="flex flex-wrap gap-1 mt-2">
+                                            {acc.rooms.map((room: any) => (
+                                                <span key={room.id} className="inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold">
+                                                    {room.name}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex gap-1 ml-2">
+                                    <Button variant="ghost" size="icon" onClick={() => { setEditingAccommodation(acc); setIsDialogOpen(true) }}>
+                                        <Pencil className="h-4 w-4 text-gray-500" />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" onClick={async () => {
+                                        if (confirm('정말 삭제하시겠습니까?')) {
+                                            const { error } = await supabase.from('accommodations').delete().eq('id', acc.id)
+                                            if (error) { alert('삭제에 실패했습니다.') } else { queryClient.invalidateQueries({ queryKey: ['accommodations'] }) }
+                                        }
+                                    }}>
+                                        <Trash2 className="h-4 w-4 text-red-500" />
+                                    </Button>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                ))}
+            </div>
         </div>
     )
 }

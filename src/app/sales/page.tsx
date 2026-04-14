@@ -175,8 +175,8 @@ export default function SalesPage() {
                         <CardHeader>
                             <CardTitle>상세 내역</CardTitle>
                         </CardHeader>
-                        <CardContent>
-                            <Table>
+                        <CardContent className="overflow-x-auto">
+                            <Table className="min-w-[500px]">
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>날짜</TableHead>

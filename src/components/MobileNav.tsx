@@ -18,6 +18,40 @@ import {
     Menu
 } from "lucide-react"
 
+export function BottomTabBar() {
+    const pathname = usePathname()
+
+    if (pathname === '/login' || pathname.startsWith('/auth')) return null
+
+    const tabs = [
+        { icon: LayoutDashboard, label: "영업현황", href: "/" },
+        { icon: CalendarDays, label: "예약관리", href: "/reservations" },
+        { icon: Ticket, label: "이용권", href: "/tickets" },
+        { icon: BedDouble, label: "숙소관리", href: "/accommodations" },
+    ]
+
+    return (
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-background border-t flex items-stretch">
+            {tabs.map((tab) => {
+                const isActive = pathname === tab.href
+                return (
+                    <Link
+                        key={tab.href}
+                        href={tab.href}
+                        className={cn(
+                            "flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-xs font-medium transition-colors",
+                            isActive ? "text-primary" : "text-muted-foreground"
+                        )}
+                    >
+                        <tab.icon className={cn("h-5 w-5", isActive ? "text-primary" : "text-muted-foreground")} />
+                        <span>{tab.label}</span>
+                    </Link>
+                )
+            })}
+        </div>
+    )
+}
+
 export function MobileNav() {
     const pathname = usePathname()
     const router = useRouter()
@@ -78,8 +112,8 @@ export function MobileNav() {
                 <div className="relative h-8 w-8">
                     <img src="/logo.png" alt="Logo" className="object-contain w-full h-full" />
                 </div>
-                <span className="font-bold text-lg text-primary">
-                    쎄시봉
+                <span className="font-bold text-sm text-primary leading-tight">
+                    쎄시봉<br />영업관리시스템
                 </span>
             </div>
 
