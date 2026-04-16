@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { createClient } from "@/lib/supabase"
 import { useEffect, useState } from "react"
+import { NotificationBell } from "@/components/NotificationBell"
 import {
     LayoutDashboard,
     BedDouble,
@@ -117,13 +118,15 @@ export function MobileNav() {
                 </span>
             </div>
 
-            <Sheet open={open} onOpenChange={setOpen}>
-                <SheetTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                        <Menu className="h-6 w-6" />
-                        <span className="sr-only">Toggle menu</span>
-                    </Button>
-                </SheetTrigger>
+            <div className="flex items-center gap-1">
+                <NotificationBell />
+                <Sheet open={open} onOpenChange={setOpen}>
+                    <SheetTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                            <Menu className="h-6 w-6" />
+                            <span className="sr-only">Toggle menu</span>
+                        </Button>
+                    </SheetTrigger>
                 <SheetContent side="left" className="w-72 p-0 flex flex-col">
                     <SheetHeader className="p-4 border-b text-left">
                         <SheetTitle className="flex items-center gap-2">
@@ -172,8 +175,9 @@ export function MobileNav() {
                             </Button>
                         </div>
                     </div>
-                </SheetContent>
-            </Sheet>
+                    </SheetContent>
+                </Sheet>
+            </div>
         </div>
     )
 }

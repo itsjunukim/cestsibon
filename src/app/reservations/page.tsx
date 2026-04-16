@@ -36,7 +36,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase"
 import { useState, Suspense, useEffect, useRef } from "react"
 import { format, addDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 
 import { DateRange } from "react-day-picker"
 import { DateRangePicker } from "@/components/DateRangePicker"
@@ -49,7 +49,7 @@ type SortConfig = {
 
 function ReservationsContent() {
     const searchParams = useSearchParams()
-    // ... (rest of the component logic stays same)
+    const router = useRouter()
 
     // ... I need to be careful not to delete the body.
     // Replace_file_content typically replaces the chunks.
@@ -91,6 +91,27 @@ function ReservationsContent() {
     })
 
     const [searchKeyword, setSearchKeyword] = useState<string>("")
+
+    // ?edit=id 파라미터 처리: 알림 등에서 진입 시 해당 예약을 자동으로 수정 다이얼로그로 오픈
+    const editIdParam = searchParams.get('edit')
+    useEffect(() => {
+        if (!editIdParam) return
+        const loadAndEdit = async () => {
+            const client = createClient()
+            const { data } = await client
+                .from("reservations")
+                .select("*, accommodations(name), rooms(name), reservation_tickets(ticket_id, quantity, tickets(name))")
+                .eq("id", editIdParam)
+                .single()
+            if (data) {
+                setEditingReservation(data)
+                setSelectedRowId(data.id)
+                setIsDialogOpen(true)
+                router.replace('/reservations', { scroll: false })
+            }
+        }
+        loadAndEdit()
+    }, [editIdParam])
 
     // Quick Date Filters
     const setToday = () => {
@@ -185,6 +206,7 @@ function ReservationsContent() {
     const updateStatus = async (id: string, status: string) => {
         await supabase.from("reservations").update({ status }).eq("id", id)
         queryClient.invalidateQueries({ queryKey: ["reservations"] })
+        queryClient.invalidateQueries({ queryKey: ["deposit-alerts"] })
     }
 
     const updateVisitStatus = async (id: string, is_visited: boolean) => {
@@ -196,6 +218,7 @@ function ReservationsContent() {
 
         await supabase.from("reservations").update({ is_visited }).eq("id", id)
         queryClient.invalidateQueries({ queryKey: ["reservations"] })
+        queryClient.invalidateQueries({ queryKey: ["deposit-alerts"] })
     }
 
     const updateDeposit = async (id: string, is_deposit_paid: boolean, deposit_paid_date: string | null) => {
@@ -212,6 +235,7 @@ function ReservationsContent() {
 
         await supabase.from("reservations").update({ is_deposit_paid, deposit_paid_date: is_deposit_paid ? dateToSave : null }).eq("id", id)
         queryClient.invalidateQueries({ queryKey: ["reservations"] })
+        queryClient.invalidateQueries({ queryKey: ["deposit-alerts"] })
     }
 
     const updateBalanceMethod = async (id: string, balance_payment_method: string | null) => {
@@ -223,6 +247,7 @@ function ReservationsContent() {
 
         await supabase.from("reservations").update({ balance_payment_method }).eq("id", id)
         queryClient.invalidateQueries({ queryKey: ["reservations"] })
+        queryClient.invalidateQueries({ queryKey: ["deposit-alerts"] })
     }
 
     const deleteReservation = async (id: string, currentStatus?: string) => {
@@ -234,6 +259,7 @@ function ReservationsContent() {
                 alert("삭제 실패")
             } else {
                 queryClient.invalidateQueries({ queryKey: ["reservations"] })
+                queryClient.invalidateQueries({ queryKey: ["deposit-alerts"] })
             }
         } else {
             if (!confirm("정말 이 예약을 취소하시겠습니까?\n시스템에서 완전히 삭제되지 않으며 '취소됨' 상태로 보존됩니다.")) return
@@ -243,6 +269,7 @@ function ReservationsContent() {
                 alert("취소 처리 실패")
             } else {
                 queryClient.invalidateQueries({ queryKey: ["reservations"] })
+                queryClient.invalidateQueries({ queryKey: ["deposit-alerts"] })
             }
         }
     }

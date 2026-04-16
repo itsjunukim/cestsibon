@@ -188,6 +188,7 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
 
             alert(initialData ? "예약이 수정되었습니다." : "예약이 생성되었습니다.")
             queryClient.invalidateQueries({ queryKey: ["reservations"] })
+            queryClient.invalidateQueries({ queryKey: ["deposit-alerts"] })
             onSuccess?.()
             if (!initialData) form.reset()
         } catch (error) {

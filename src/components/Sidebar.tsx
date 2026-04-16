@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase"
 import { useEffect, useState } from "react"
+import { NotificationBell } from "@/components/NotificationBell"
 import {
     LayoutDashboard,
     BedDouble,
@@ -83,15 +84,18 @@ export function Sidebar() {
 
     return (
         <div className="flex h-full w-64 flex-col border-r bg-card text-card-foreground shadow-xl">
-            <Link href="/" className="flex h-20 items-center justify-center border-b px-4 gap-3 hover:bg-muted/50 transition-colors">
-                <div className="relative h-14 w-14">
-                    <img src="/logo.png" alt="Logo" className="object-contain w-full h-full" />
-                </div>
-                <span className="text-lg font-bold text-primary leading-tight">
-                    쎄시봉<br />
-                    영업관리시스템
-                </span>
-            </Link>
+            <div className="flex h-20 items-center border-b pr-2">
+                <Link href="/" className="flex items-center gap-3 flex-1 h-full px-4 hover:bg-muted/50 transition-colors">
+                    <div className="relative h-14 w-14">
+                        <img src="/logo.png" alt="Logo" className="object-contain w-full h-full" />
+                    </div>
+                    <span className="text-base font-bold text-primary leading-tight">
+                        쎄시봉<br />
+                        영업관리시스템
+                    </span>
+                </Link>
+                <NotificationBell />
+            </div>
             <div className="flex-1 overflow-auto py-6">
                 <nav className="grid gap-2 px-4">
                     {sidebarItems.map((item, index) => {
