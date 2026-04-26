@@ -181,12 +181,16 @@ CREATE TABLE reservations (
 #### 3.2.7 차액 결제수단 (Balance Payment Method)
 ```
 드롭다운 옵션:
-├── (미선택)
-├── 이체 (bank_transfer)
-├── 카드 (card)
-└── 현금 (cash)
+├── 미정 (none, 현장결제 혹은 추후)
+├── 계좌이체 (transfer)
+├── 카드 결제 (card)
+├── 현금 결제 (cash)
+├── 플레이스 결제 (place)
+├── 스토어 결제 (store)
+└── 소셜 결제 (social)
 ```
 **저장**: balance_payment_method 컬럼에 저장
+**예약 목록 표시**: 잔금 옆 배지로 축약 라벨(이체/카드/현금/플레이스/스토어/소셜) 노출
 
 #### 3.2.8 고객 방문 상태 (Visited)
 ```
@@ -226,6 +230,10 @@ RETURNING id;
 // 수정
 UPDATE reservations SET ... WHERE id = ?;
 ```
+
+**캘린더 표기**:
+- 예약 날짜 / 예약금 입금일 캘린더에서 **금요일·토요일** 날짜 폰트는 빨간색(`text-red-500`)으로 강조
+- 선택된 날짜는 기존 강조색(primary) 유지
 
 #### 3.2.10 예약 삭제 (취소)
 
@@ -317,7 +325,47 @@ const rooms = await supabase
 
 ---
 
-## 5. 영업 현황 (/sales)
+## 5. 이용권 관리 (/tickets)
+
+### 5.1 데이터 구조
+```sql
+tickets (
+  id UUID PRIMARY KEY,
+  name TEXT NOT NULL,           -- 이용권 명칭 (예: 종일권, 오전권)
+  price NUMERIC NOT NULL,       -- 가격
+  display_order INTEGER,        -- 표시 순서 (오름차순)
+  created_at TIMESTAMPTZ
+)
+```
+
+### 5.2 주요 기능
+
+#### 5.2.1 이용권 목록
+- **정렬 기준**: `display_order` ASC, 동순위는 `name` ASC
+- **표시 항목**: No., 이용권 명칭, 가격, 관리(수정/삭제)
+- 첫 행에 드래그 손잡이(≡) 노출
+
+#### 5.2.2 수동 정렬 (드래그앤드롭)
+**동작**:
+1. 좌측 ≡ 손잡이 클릭/터치 후 드래그
+2. 놓으면 즉시 DB의 `display_order` 일괄 갱신 (낙관적 UI 업데이트)
+3. 실패 시 알림 후 원복
+
+**적용 범위**:
+- 이용권 관리 페이지 목록 정렬
+- 예약 생성/수정 폼의 이용권 드롭다운 순서
+
+#### 5.2.3 이용권 추가/수정
+- **추가**: 신규 이용권은 `MAX(display_order) + 1`로 자동 부여 → 목록 맨 끝에 배치
+- **수정**: 명칭/가격만 변경, 순서는 유지
+
+#### 5.2.4 이용권 삭제
+- 휴지통 아이콘 클릭 → 확인 → DELETE
+- 참조 중인 예약(`reservation_tickets`)이 있으면 cascade 처리
+
+---
+
+## 6. 영업 현황 (/sales)
 
 ### 5.1 화면 구성
 
@@ -376,7 +424,7 @@ const rooms = await supabase
 
 ---
 
-## 6. 직원 관리 (/admin/users)
+## 7. 직원 관리 (/admin/users)
 
 ### 6.1 데이터 구조
 ```sql
@@ -448,7 +496,7 @@ await supabase.from('profiles').insert({
 
 ---
 
-## 7. 예약금 미입금 알림
+## 8. 예약금 미입금 알림
 
 ### 7.1 알림 조건
 ```
@@ -479,7 +527,7 @@ AND 오늘 ≤ date ≤ 오늘 + 2일
 
 ---
 
-## 8. 모바일 UI/UX
+## 9. 모바일 UI/UX
 
 ### 8.1 하단 탭 바
 - **표시**: `md:hidden` (모바일에서만)
@@ -506,7 +554,7 @@ AND 오늘 ≤ date ≤ 오늘 + 2일
 
 ---
 
-## 9. 공통 기능
+## 10. 공통 기능
 
 ### 7.1 데이터 새로고침
 - **방법**: React Query의 `useQuery` 훅 사용
@@ -530,7 +578,7 @@ if (error) {
 
 ---
 
-## 10. 향후 개선사항
+## 11. 향후 개선사항
 
 - [ ] 예약 취소 이력 별도 관리
 - [ ] SMS/카카오 알림톡 발송
