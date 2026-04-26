@@ -58,10 +58,17 @@ export function TicketForm({ onSuccess, initialData }: TicketFormProps) {
                     .eq("id", initialData.id)
                 error = updateError;
             } else {
-                // Insert
+                // Insert: 새 이용권은 목록 맨 끝에 배치
+                const { data: maxRow } = await supabase
+                    .from("tickets")
+                    .select("display_order")
+                    .order("display_order", { ascending: false, nullsFirst: false })
+                    .limit(1)
+                    .maybeSingle()
+                const nextOrder = (maxRow?.display_order ?? 0) + 1
                 const { error: insertError } = await supabase
                     .from("tickets")
-                    .insert([formattedValues])
+                    .insert([{ ...formattedValues, display_order: nextOrder }])
                 error = insertError;
             }
 

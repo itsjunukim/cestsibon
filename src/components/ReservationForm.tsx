@@ -75,7 +75,11 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
     const { data: tickets } = useQuery({
         queryKey: ["tickets"],
         queryFn: async () => {
-            const { data } = await supabase.from("tickets").select("id, name, price")
+            const { data } = await supabase
+                .from("tickets")
+                .select("id, name, price, display_order")
+                .order("display_order", { ascending: true, nullsFirst: false })
+                .order("name", { ascending: true })
             return data || []
         }
     })
@@ -265,6 +269,12 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                                         disabled={(date) =>
                                             date < new Date("1900-01-01")
                                         }
+                                        modifiers={{
+                                            weekend: (date) => date.getDay() === 5 || date.getDay() === 6,
+                                        }}
+                                        modifiersClassNames={{
+                                            weekend: "text-red-500",
+                                        }}
                                         initialFocus
                                     />
                                 </PopoverContent>
@@ -617,6 +627,12 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                                                         locale={ko}
                                                         selected={field.value}
                                                         onSelect={(date) => field.onChange(date)}
+                                                        modifiers={{
+                                                            weekend: (date) => date.getDay() === 5 || date.getDay() === 6,
+                                                        }}
+                                                        modifiersClassNames={{
+                                                            weekend: "text-red-500",
+                                                        }}
                                                         initialFocus
                                                     />
                                                 </PopoverContent>
@@ -659,6 +675,9 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                                                     <SelectItem value="transfer">계좌이체</SelectItem>
                                                     <SelectItem value="card">카드 결제</SelectItem>
                                                     <SelectItem value="cash">현금 결제</SelectItem>
+                                                    <SelectItem value="place">플레이스 결제</SelectItem>
+                                                    <SelectItem value="store">스토어 결제</SelectItem>
+                                                    <SelectItem value="social">소셜 결제</SelectItem>
                                                 </SelectContent>
                                             </Select>
                                             <FormMessage />

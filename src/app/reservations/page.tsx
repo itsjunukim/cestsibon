@@ -636,7 +636,7 @@ function ReservationsContent() {
                                                             <span>{fmtMoney(res.balance)}</span>
                                                             {res.balance_payment_method ? (
                                                                 <span className="text-[10px] bg-white px-1 border border-red-200 rounded-sm text-red-700 font-bold shadow-sm">
-                                                                    {res.balance_payment_method === 'transfer' ? '이체' : res.balance_payment_method === 'card' ? '카드' : res.balance_payment_method === 'cash' ? '현금' : '미정'}
+                                                                    {res.balance_payment_method === 'transfer' ? '이체' : res.balance_payment_method === 'card' ? '카드' : res.balance_payment_method === 'cash' ? '현금' : res.balance_payment_method === 'place' ? '플레이스' : res.balance_payment_method === 'store' ? '스토어' : res.balance_payment_method === 'social' ? '소셜' : '미정'}
                                                                 </span>
                                                             ) : (
                                                                 <span className="text-[10px] bg-red-100 px-1 rounded-sm text-red-600 font-bold shadow-sm">미정</span>
