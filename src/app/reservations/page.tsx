@@ -209,6 +209,14 @@ function ReservationsContent() {
         queryClient.invalidateQueries({ queryKey: ["deposit-alerts"] })
     }
 
+    const handleStatusChange = async (res: any, newStatus: string) => {
+        if (newStatus === res.status) return;
+        if (newStatus === 'cancelled') {
+            if (!confirm("정말 이 예약을 취소하시겠습니까?\n시스템에서 완전히 삭제되지 않으며 '취소됨' 상태로 보존됩니다.")) return;
+        }
+        await updateStatus(res.id, newStatus);
+    }
+
     const updateVisitStatus = async (id: string, is_visited: boolean) => {
         // Optimistic UI Update
         queryClient.setQueriesData({ queryKey: ["reservations"] }, (old: any) => {
@@ -250,27 +258,15 @@ function ReservationsContent() {
         queryClient.invalidateQueries({ queryKey: ["deposit-alerts"] })
     }
 
-    const deleteReservation = async (id: string, currentStatus?: string) => {
-        if (currentStatus === 'cancelled') {
-            if (!confirm("이미 취소된 예약입니다. 데이터가 완전히 삭제되며 복구할 수 없습니다.\n정말 '영구 삭제' 하시겠습니까?")) return
-            const { error } = await supabase.from("reservations").delete().eq("id", id)
-            if (error) {
-                console.error(error)
-                alert("삭제 실패")
-            } else {
-                queryClient.invalidateQueries({ queryKey: ["reservations"] })
-                queryClient.invalidateQueries({ queryKey: ["deposit-alerts"] })
-            }
+    const deleteReservation = async (id: string) => {
+        if (!confirm("데이터가 완전히 삭제되며 복구할 수 없습니다.\n정말 '영구 삭제' 하시겠습니까?")) return
+        const { error } = await supabase.from("reservations").delete().eq("id", id)
+        if (error) {
+            console.error(error)
+            alert("삭제 실패")
         } else {
-            if (!confirm("정말 이 예약을 취소하시겠습니까?\n시스템에서 완전히 삭제되지 않으며 '취소됨' 상태로 보존됩니다.")) return
-            const { error } = await supabase.from("reservations").update({ status: 'cancelled' }).eq("id", id)
-            if (error) {
-                console.error(error)
-                alert("취소 처리 실패")
-            } else {
-                queryClient.invalidateQueries({ queryKey: ["reservations"] })
-                queryClient.invalidateQueries({ queryKey: ["deposit-alerts"] })
-            }
+            queryClient.invalidateQueries({ queryKey: ["reservations"] })
+            queryClient.invalidateQueries({ queryKey: ["deposit-alerts"] })
         }
     }
 
@@ -654,24 +650,30 @@ function ReservationsContent() {
                                     )}
                                     {visibleColumns.status && (
                                         <TableCell>
-                                            <span className={`px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${res.status === 'completed' ? 'bg-green-100 text-green-700' : res.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                                {res.status === 'booked' ? '예약됨' : res.status === 'completed' ? '완료' : res.status === 'cancelled' ? '취소됨' : res.status}
-                                            </span>
+                                            <div onClick={(e) => e.stopPropagation()}>
+                                                <Select value={res.status} onValueChange={(val) => handleStatusChange(res, val)}>
+                                                    <SelectTrigger className={`h-7 px-3 py-1 border-0 rounded-full text-xs font-semibold whitespace-nowrap w-fit shadow-sm focus:ring-0 focus:ring-offset-0 ${res.status === 'completed' ? 'bg-green-100 text-green-700 hover:bg-green-200' : res.status === 'cancelled' ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'}`}>
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="booked">예약됨</SelectItem>
+                                                        <SelectItem value="completed">완료</SelectItem>
+                                                        <SelectItem value="cancelled">취소됨</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
                                         </TableCell>
                                     )}
                                     <TableCell className="text-right">
                                         <div className="flex justify-end gap-1">
-                                            {res.status === 'booked' && (
-                                                <Button variant="ghost" size="icon" title="완료 처리" onClick={() => updateStatus(res.id, 'completed')} className="text-green-600 hover:bg-green-50 h-8 w-8">
-                                                    <Check className="h-4 w-4" />
-                                                </Button>
-                                            )}
                                             <Button variant="ghost" size="icon" title="수정" onClick={() => openEditDialog(res)} className="h-8 w-8">
                                                 <Pencil className="h-4 w-4" />
                                             </Button>
-                                            <Button variant="ghost" size="icon" title={res.status === 'cancelled' ? '영구 삭제' : '취소'} onClick={() => deleteReservation(res.id, res.status)} className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8">
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
+                                            {res.status === 'cancelled' && (
+                                                <Button variant="ghost" size="icon" title="영구 삭제" onClick={() => deleteReservation(res.id)} className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8">
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            )}
                                         </div>
                                     </TableCell>
                                 </TableRow>
@@ -704,14 +706,18 @@ function ReservationsContent() {
                                             {format(new Date(res.date), "yyyy-MM-dd")} • {formatPhone(res.phone || "") || "연락처 없음"}
                                         </CardDescription>
                                     </div>
-                                    <span className={`px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${res.status === 'completed' ? 'bg-green-100 text-green-700' :
-                                        res.status === 'cancelled' ? 'bg-red-100 text-red-700' :
-                                            'bg-yellow-100 text-yellow-700'
-                                        }`}>
-                                        {res.status === 'booked' ? '예약됨' :
-                                            res.status === 'completed' ? '완료' :
-                                                res.status === 'cancelled' ? '취소됨' : res.status}
-                                    </span>
+                                    <div onClick={(e) => e.stopPropagation()}>
+                                        <Select value={res.status} onValueChange={(val) => handleStatusChange(res, val)}>
+                                            <SelectTrigger className={`h-7 px-3 py-1 border-0 rounded-full text-xs font-semibold whitespace-nowrap w-fit shadow-sm focus:ring-0 focus:ring-offset-0 ${res.status === 'completed' ? 'bg-green-100 text-green-700 hover:bg-green-200' : res.status === 'cancelled' ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'}`}>
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="booked">예약됨</SelectItem>
+                                                <SelectItem value="completed">완료</SelectItem>
+                                                <SelectItem value="cancelled">취소됨</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
                                 </div>
                             </CardHeader>
                             <CardContent className="text-sm space-y-3 pb-3">
@@ -768,17 +774,14 @@ function ReservationsContent() {
                                 )}
                             </CardContent>
                             <div className="flex items-center justify-end gap-2 p-3 border-t bg-muted/20">
-                                {res.status === 'booked' && (
-                                    <Button size="sm" variant="outline" onClick={() => updateStatus(res.id, 'completed')} className="text-green-600 hover:text-green-700 border-green-200 hover:bg-green-50">
-                                        <Check className="h-4 w-4 mr-1" /> 완료
-                                    </Button>
-                                )}
                                 <Button size="sm" variant="ghost" onClick={() => openEditDialog(res)}>
                                     <Pencil className="h-4 w-4 mr-1" /> 수정
                                 </Button>
-                                <Button size="sm" variant="ghost" title={res.status === 'cancelled' ? '영구 삭제' : '취소'} onClick={() => deleteReservation(res.id, res.status)} className="text-red-500 hover:text-red-700 hover:bg-red-50">
-                                    <Trash2 className="h-4 w-4" />
-                                </Button>
+                                {res.status === 'cancelled' && (
+                                    <Button size="sm" variant="ghost" title="영구 삭제" onClick={() => deleteReservation(res.id)} className="text-red-500 hover:text-red-700 hover:bg-red-50">
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                )}
                             </div>
                         </Card>
                     ))
