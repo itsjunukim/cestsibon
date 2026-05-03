@@ -203,36 +203,38 @@ export function AccommodationForm({ onSuccess, initialData }: AccommodationFormP
                             추가
                         </Button>
                     </div>
-                    {fields.map((field, index) => (
-                        <div key={field.id} className="flex gap-2">
-                            <FormField
-                                control={form.control}
-                                name={`rooms.${index}.name`}
-                                render={({ field }) => (
-                                    <FormItem className="flex-1">
-                                        <FormControl>
-                                            <Input placeholder="예: 2인실, 4인실..." {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => remove(index)}
-                                className="mt-0"
-                            >
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
-                        </div>
-                    ))}
-                    {fields.length === 0 && (
-                        <div className="text-sm text-muted-foreground text-center py-2 border rounded-md border-dashed">
-                            등록된 방 종류가 없습니다.
-                        </div>
-                    )}
+                    <div className="max-h-[240px] overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                        {fields.map((field, index) => (
+                            <div key={field.id} className="flex gap-2 items-start">
+                                <FormField
+                                    control={form.control}
+                                    name={`rooms.${index}.name`}
+                                    render={({ field }) => (
+                                        <FormItem className="flex-1">
+                                            <FormControl>
+                                                <Input placeholder="예: 2인실, 4인실..." {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => remove(index)}
+                                    className="mt-0"
+                                >
+                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
+                            </div>
+                        ))}
+                        {fields.length === 0 && (
+                            <div className="text-sm text-muted-foreground text-center py-4 border rounded-md border-dashed">
+                                등록된 방 종류가 없습니다.
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 <Button type="submit" disabled={isLoading} className="w-full">

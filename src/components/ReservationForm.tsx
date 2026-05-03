@@ -207,7 +207,7 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
         <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-1 lg:grid-cols-[1fr_400px] xl:grid-cols-[1.5fr_1fr] gap-8 w-full">
                 {/* Left Column - Reservation Data */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 content-start">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 content-start min-w-0">
                     <div className="col-span-full">
                     <FormField
                         control={form.control}
@@ -331,7 +331,7 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                     control={form.control}
                     name="accommodation_id"
                     render={({ field }) => (
-                        <FormItem>
+                        <FormItem className="min-w-0">
                             <FormLabel>숙소</FormLabel>
                             <Select
                                 onValueChange={(val) => field.onChange(val === "__none__" ? "" : val)}
@@ -365,7 +365,7 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                     control={form.control}
                     name="room_id"
                     render={({ field }) => (
-                        <FormItem>
+                        <FormItem className="min-w-0">
                             <FormLabel>방 종류</FormLabel>
                             <Select
                                 onValueChange={(val) => field.onChange(val === "__none__" ? "" : val)}
