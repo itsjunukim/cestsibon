@@ -462,6 +462,7 @@ function ReservationsContent() {
                                 <DialogTitle>{editingReservation ? "예약 수정" : "새 예약 생성"}</DialogTitle>
                             </DialogHeader>
                             <ReservationForm
+                                key={editingReservation?.id || 'new'}
                                 onSuccess={() => setIsDialogOpen(false)}
                                 initialData={editingReservation}
                             />
@@ -573,7 +574,7 @@ function ReservationsContent() {
                                     )}
                                     {visibleColumns.headcount && <TableCell>{res.headcount || 1}명</TableCell>}
                                     {visibleColumns.accommodation && (
-                                        <TableCell className="whitespace-nowrap">
+                                        <TableCell className="max-w-[120px] truncate" title={res.accommodations?.name ? `${res.accommodations.name}${res.rooms?.name ? ` (${res.rooms.name})` : ""}` : ""}>
                                             {res.accommodations?.name ? (
                                                 <span className="font-medium text-indigo-600">
                                                     🏠 {res.accommodations.name}{res.rooms?.name ? ` (${res.rooms.name})` : ""}

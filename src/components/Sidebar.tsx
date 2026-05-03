@@ -14,7 +14,8 @@ import {
     CreditCard,
     Ticket,
     Users,
-    LogOut
+    LogOut,
+    Calculator
 } from "lucide-react"
 
 import { useRouter } from "next/navigation"
@@ -68,6 +69,7 @@ export function Sidebar() {
         { icon: CalendarDays, label: "예약 관리", href: "/reservations" },
         { icon: Ticket, label: "이용권 관리", href: "/tickets" },
         { icon: BedDouble, label: "숙소 관리", href: "/accommodations" },
+        { icon: Calculator, label: "정산 관리", href: "/settlements" },
     ]
 
     if (userRole === 'admin') {

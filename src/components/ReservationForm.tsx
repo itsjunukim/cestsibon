@@ -18,7 +18,7 @@ import { createClient } from "@/lib/supabase"
 import { useQueryClient, useQuery } from "@tanstack/react-query"
 import { Loader2 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { format } from "date-fns"
@@ -49,6 +49,11 @@ const formSchema = z.object({
     is_visited: z.boolean().optional(),
     notes: z.string().optional(),
     status: z.string().optional(),
+    // 숙소 정산 금액
+    settlement_accommodation: z.string().optional(),
+    settlement_meat: z.string().optional(),
+    settlement_other: z.string().optional(),
+    settlement_other_memo: z.string().optional(),
 })
 
 type ReservationFormValues = z.infer<typeof formSchema>
@@ -63,6 +68,20 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
     const [isCalendarOpen, setIsCalendarOpen] = useState(false) // State for Calendar Popover
     const queryClient = useQueryClient()
     const supabase = createClient()
+
+    // 숙소 정산 데이터 로드
+    const { data: settlements } = useQuery({
+        queryKey: ["settlements", initialData?.id],
+        queryFn: async () => {
+            if (!initialData?.id) return []
+            const { data } = await supabase
+                .from("accommodation_settlements")
+                .select("*")
+                .eq("reservation_id", initialData.id)
+            return data || []
+        },
+        enabled: !!initialData?.id,
+    })
 
     const { data: accommodations } = useQuery({
         queryKey: ["accommodations"],
@@ -110,6 +129,10 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                 : [],
             pickup_location: initialData?.pickup_location || "",
             pickup_time: initialData?.pickup_time || "",
+            settlement_accommodation: "",
+            settlement_meat: "",
+            settlement_other: "",
+            settlement_other_memo: "",
         },
     })
 
@@ -126,9 +149,31 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
     })
 
     // 숙소가 바뀌면 방 선택 초기화
+    const prevAccIdRef = useRef(initialData?.accommodation_id || "");
     useEffect(() => {
-        form.setValue("room_id", "")
-    }, [selectedAccommodationId])
+        if (selectedAccommodationId === prevAccIdRef.current) {
+            return;
+        }
+        prevAccIdRef.current = selectedAccommodationId || "";
+        form.setValue("room_id", "");
+    }, [selectedAccommodationId, form])
+
+    // 정산 데이터가 로드되면 폼에 반영
+    useEffect(() => {
+        if (settlements && settlements.length > 0) {
+            settlements.forEach((s: any) => {
+                const amount = s.amount ? String(s.amount) : "";
+                if (s.category === 'accommodation') {
+                    form.setValue('settlement_accommodation', amount);
+                } else if (s.category === 'meat') {
+                    form.setValue('settlement_meat', amount);
+                } else if (s.category === 'other') {
+                    form.setValue('settlement_other', amount);
+                    form.setValue('settlement_other_memo', s.memo || "");
+                }
+            });
+        }
+    }, [settlements])
 
     // Calculate balance automatically
     const totalAmount = Number(String(form.watch("total_amount") || "0").replace(/[^0-9]/g, ''))
@@ -138,7 +183,7 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
     async function onSubmit(values: z.infer<typeof formSchema>) {
         setIsLoading(true)
         try {
-            const { selected_tickets, ...reservationData } = values;
+            const { selected_tickets, settlement_accommodation, settlement_meat, settlement_other, settlement_other_memo, ...reservationData } = values;
 
             const formattedValues = {
                 ...reservationData,
@@ -188,6 +233,43 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                     }));
                     await supabase.from("reservation_tickets").insert(ticketInserts);
                 }
+
+                // 숙소 정산 금액 저장
+                const accommodationId = formattedValues.accommodation_id;
+                await supabase.from("accommodation_settlements").delete().eq("reservation_id", currentReservationId);
+                const settlementInserts = [];
+                const settAccAmount = Number(String(settlement_accommodation || "0").replace(/[^0-9]/g, ''));
+                const settMeatAmount = Number(String(settlement_meat || "0").replace(/[^0-9]/g, ''));
+                const settOtherAmount = Number(String(settlement_other || "0").replace(/[^0-9]/g, ''));
+
+                if (settAccAmount > 0) {
+                    settlementInserts.push({
+                        reservation_id: currentReservationId,
+                        accommodation_id: accommodationId || null,
+                        category: 'accommodation',
+                        amount: settAccAmount,
+                    });
+                }
+                if (settMeatAmount > 0) {
+                    settlementInserts.push({
+                        reservation_id: currentReservationId,
+                        accommodation_id: accommodationId || null,
+                        category: 'meat',
+                        amount: settMeatAmount,
+                    });
+                }
+                if (settOtherAmount > 0) {
+                    settlementInserts.push({
+                        reservation_id: currentReservationId,
+                        accommodation_id: accommodationId || null,
+                        category: 'other',
+                        amount: settOtherAmount,
+                        memo: settlement_other_memo || null,
+                    });
+                }
+                if (settlementInserts.length > 0) {
+                    await supabase.from("accommodation_settlements").insert(settlementInserts);
+                }
             }
 
             alert(initialData ? "예약이 수정되었습니다." : "예약이 생성되었습니다.")
@@ -217,7 +299,7 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                                 <FormLabel>예약 유형</FormLabel>
                                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                                     <FormControl>
-                                        <SelectTrigger>
+                                        <SelectTrigger className="w-fit">
                                             <SelectValue placeholder="유형 선택" />
                                         </SelectTrigger>
                                     </FormControl>
@@ -369,7 +451,7 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                             <FormLabel>방 종류</FormLabel>
                             <Select
                                 onValueChange={(val) => field.onChange(val === "__none__" ? "" : val)}
-                                value={field.value || ""}
+                                value={field.value ? String(field.value) : ""}
                                 disabled={!selectedAccommodationId}
                             >
                                 <FormControl>
@@ -381,7 +463,7 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                                     <SelectItem value="__none__">선택 안함</SelectItem>
                                     {rooms && rooms.length > 0 ? (
                                         rooms.map((room: any) => (
-                                            <SelectItem key={room.id} value={room.id}>
+                                            <SelectItem key={room.id} value={String(room.id)}>
                                                 {room.name}
                                             </SelectItem>
                                         ))
@@ -720,6 +802,113 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                         </div>
                     </div>
                 </div>
+
+                {/* 숙소 정산 금액 섹션 - 숙박 예약인 경우만 노출 */}
+                {form.watch("reservation_type") === "accommodation" && (
+                <div className="col-span-full border border-indigo-200 bg-indigo-50/30 rounded-md p-5 space-y-4 shadow-sm mt-4">
+                    <div className="flex justify-between items-center border-b border-indigo-200 pb-3">
+                        <span className="text-indigo-800 font-extrabold text-base">🏠 숙소 정산 금액</span>
+                        <span className="text-xs text-indigo-500 font-medium">숙소에 정산할 금액을 입력하세요</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* 숙소 정산 */}
+                        <FormField
+                            control={form.control}
+                            name="settlement_accommodation"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="font-bold text-slate-700 text-sm">숙소</FormLabel>
+                                    <FormControl>
+                                        <div className="relative flex items-center">
+                                            <Input type="text" placeholder="0" className="bg-white pr-8 text-right font-bold" {...field} onChange={(e) => {
+                                                const raw = e.target.value.replace(/[^0-9]/g, "");
+                                                field.onChange(raw ? Number(raw).toLocaleString() : "");
+                                            }} value={field.value ? Number(String(field.value).replace(/[^0-9]/g, "")).toLocaleString() : ""} />
+                                            <span className="absolute right-3 text-sm text-slate-500 font-bold pointer-events-none">원</span>
+                                        </div>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        {/* 고기 정산 */}
+                        <FormField
+                            control={form.control}
+                            name="settlement_meat"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="font-bold text-slate-700 text-sm">고기</FormLabel>
+                                    <FormControl>
+                                        <div className="relative flex items-center">
+                                            <Input type="text" placeholder="0" className="bg-white pr-8 text-right font-bold" {...field} onChange={(e) => {
+                                                const raw = e.target.value.replace(/[^0-9]/g, "");
+                                                field.onChange(raw ? Number(raw).toLocaleString() : "");
+                                            }} value={field.value ? Number(String(field.value).replace(/[^0-9]/g, "")).toLocaleString() : ""} />
+                                            <span className="absolute right-3 text-sm text-slate-500 font-bold pointer-events-none">원</span>
+                                        </div>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        {/* 기타 정산 */}
+                        <FormField
+                            control={form.control}
+                            name="settlement_other"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="font-bold text-slate-700 text-sm">기타</FormLabel>
+                                    <FormControl>
+                                        <div className="relative flex items-center">
+                                            <Input type="text" placeholder="0" className="bg-white pr-8 text-right font-bold" {...field} onChange={(e) => {
+                                                const raw = e.target.value.replace(/[^0-9]/g, "");
+                                                field.onChange(raw ? Number(raw).toLocaleString() : "");
+                                            }} value={field.value ? Number(String(field.value).replace(/[^0-9]/g, "")).toLocaleString() : ""} />
+                                            <span className="absolute right-3 text-sm text-slate-500 font-bold pointer-events-none">원</span>
+                                        </div>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </div>
+
+                    {/* 기타 사유 메모 - 기타 금액이 입력된 경우에만 노출 */}
+                    {Number(String(form.watch("settlement_other") || "0").replace(/[^0-9]/g, '')) > 0 && (
+                        <FormField
+                            control={form.control}
+                            name="settlement_other_memo"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="font-bold text-slate-600 text-xs">기타 정산 사유</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="정산 사유를 간단히 입력하세요" className="bg-white text-sm" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    )}
+
+                    {/* 정산 합계 */}
+                    <div className="flex justify-end items-center pt-3 border-t border-indigo-200">
+                        <span className="text-sm font-bold text-slate-600 mr-3">정산 합계</span>
+                        <span className="text-lg font-extrabold text-indigo-700">
+                            {(() => {
+                                const a = Number(String(form.watch("settlement_accommodation") || "0").replace(/[^0-9]/g, ''));
+                                const m = Number(String(form.watch("settlement_meat") || "0").replace(/[^0-9]/g, ''));
+                                const o = Number(String(form.watch("settlement_other") || "0").replace(/[^0-9]/g, ''));
+                                return (a + m + o).toLocaleString();
+                            })()}
+                            <span className="text-sm ml-1">원</span>
+                        </span>
+                    </div>
+                </div>
+                )}
+
                 </div> {/* End Left Column */}
 
                 {/* Right Column - Notes & Submit */}
