@@ -13,6 +13,7 @@ import { useState } from "react"
 interface DepositAlert {
     id: string
     date: string
+    created_at: string
     customer_name: string
     phone: string | null
     reservation_type: string | null
@@ -32,16 +33,16 @@ export function NotificationBell() {
         queryKey: ["deposit-alerts"],
         queryFn: async () => {
             const today = startOfDay(new Date())
-            const twoDaysLater = addDays(today, 2)
+            const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000)
 
             const { data, error } = await supabase
                 .from("reservations")
-                .select("id, date, customer_name, phone, reservation_type, headcount, total_amount, deposit, accommodations(name)")
+                .select("id, date, created_at, customer_name, phone, reservation_type, headcount, total_amount, deposit, accommodations(name)")
                 .eq("is_deposit_paid", false)
                 .eq("status", "booked")
                 .gte("date", format(today, "yyyy-MM-dd"))
-                .lte("date", format(twoDaysLater, "yyyy-MM-dd"))
-                .order("date", { ascending: true })
+                .lte("created_at", twelveHoursAgo.toISOString())
+                .order("created_at", { ascending: false })
 
             if (error) {
                 console.error("Notification fetch error:", error)
@@ -109,7 +110,7 @@ export function NotificationBell() {
                         )}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                        이틀 이내 예약 중 예약금 미입금 건
+                        예약 생성 후 12시간 경과된 예약금 미입금 건
                     </p>
                 </div>
 
