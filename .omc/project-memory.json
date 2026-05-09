@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1776265447423,
+  "lastScanned": 1778252287328,
   "projectRoot": "/Users/junukim/repo/cestsibon",
   "techStack": {
     "languages": [
@@ -78,7 +78,7 @@
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 8,
-      "lastAccessed": 1776265447413,
+      "lastAccessed": 1778252287317,
       "keyFiles": [
         "ADMIN_GUIDE.md",
         "ADMIN_TASK_PLAN.md",
@@ -91,7 +91,7 @@
       "path": "public",
       "purpose": "Public files",
       "fileCount": 6,
-      "lastAccessed": 1776265447415,
+      "lastAccessed": 1778252287317,
       "keyFiles": [
         "file.svg",
         "globe.svg",
@@ -104,7 +104,7 @@
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1776265447415,
+      "lastAccessed": 1778252287319,
       "keyFiles": [
         "middleware.ts"
       ]
@@ -113,7 +113,7 @@
       "path": "supabase",
       "purpose": null,
       "fileCount": 2,
-      "lastAccessed": 1776265447416,
+      "lastAccessed": 1778252287320,
       "keyFiles": [
         "config.toml"
       ]
@@ -122,7 +122,7 @@
       "path": "src/app",
       "purpose": "Application code",
       "fileCount": 5,
-      "lastAccessed": 1776265447416,
+      "lastAccessed": 1778252287320,
       "keyFiles": [
         "favicon.ico",
         "globals.css",
@@ -132,8 +132,8 @@
     "src/components": {
       "path": "src/components",
       "purpose": "UI components",
-      "fileCount": 13,
-      "lastAccessed": 1776265447416,
+      "fileCount": 14,
+      "lastAccessed": 1778252287320,
       "keyFiles": [
         "AccommodationForm.tsx",
         "DateRangePicker.tsx",
@@ -144,7 +144,7 @@
       "path": "src/lib",
       "purpose": "Library code",
       "fileCount": 2,
-      "lastAccessed": 1776265447416,
+      "lastAccessed": 1778252287320,
       "keyFiles": [
         "supabase.ts",
         "utils.ts"
@@ -153,27 +153,51 @@
   },
   "hotPaths": [
     {
-      "path": "src/app/reservations/page.tsx",
-      "accessCount": 37,
-      "lastAccessed": 1776351236261,
+      "path": "src/components/ReservationForm.tsx",
+      "accessCount": 72,
+      "lastAccessed": 1778295558246,
       "type": "file"
     },
     {
-      "path": "src/app/sales/page.tsx",
-      "accessCount": 22,
-      "lastAccessed": 1776174871674,
-      "type": "directory"
-    },
-    {
-      "path": "src/components/ReservationForm.tsx",
-      "accessCount": 18,
-      "lastAccessed": 1776176551179,
+      "path": "src/app/reservations/page.tsx",
+      "accessCount": 66,
+      "lastAccessed": 1778294998244,
       "type": "file"
     },
     {
       "path": "src/app/accommodations/page.tsx",
-      "accessCount": 12,
-      "lastAccessed": 1776174867909,
+      "accessCount": 25,
+      "lastAccessed": 1778255156278,
+      "type": "file"
+    },
+    {
+      "path": "src/app/sales/page.tsx",
+      "accessCount": 23,
+      "lastAccessed": 1778254495151,
+      "type": "directory"
+    },
+    {
+      "path": "src/app/settlements/page.tsx",
+      "accessCount": 22,
+      "lastAccessed": 1778295646123,
+      "type": "file"
+    },
+    {
+      "path": "src/components/NotificationBell.tsx",
+      "accessCount": 21,
+      "lastAccessed": 1778294980926,
+      "type": "file"
+    },
+    {
+      "path": "src/components/ReservationAlertDialog.tsx",
+      "accessCount": 19,
+      "lastAccessed": 1778294980858,
+      "type": "file"
+    },
+    {
+      "path": "src/app/tickets/page.tsx",
+      "accessCount": 18,
+      "lastAccessed": 1778255190574,
       "type": "file"
     },
     {
@@ -183,15 +207,33 @@
       "type": "file"
     },
     {
+      "path": "src/components/AccommodationForm.tsx",
+      "accessCount": 12,
+      "lastAccessed": 1778254776862,
+      "type": "file"
+    },
+    {
       "path": "src/app/page.tsx",
       "accessCount": 9,
       "lastAccessed": 1776174695221,
       "type": "file"
     },
     {
-      "path": "src/components/AccommodationForm.tsx",
+      "path": "src/components/TicketForm.tsx",
+      "accessCount": 7,
+      "lastAccessed": 1778254778246,
+      "type": "file"
+    },
+    {
+      "path": "src/components/SalesEntryForm.tsx",
+      "accessCount": 7,
+      "lastAccessed": 1778254778785,
+      "type": "file"
+    },
+    {
+      "path": "src/app/admin/users/page.tsx",
       "accessCount": 5,
-      "lastAccessed": 1776001681550,
+      "lastAccessed": 1778295017346,
       "type": "file"
     },
     {
@@ -220,8 +262,20 @@
     },
     {
       "path": "src/components/Sidebar.tsx",
-      "accessCount": 3,
-      "lastAccessed": 1776176470180,
+      "accessCount": 4,
+      "lastAccessed": 1778254536727,
+      "type": "file"
+    },
+    {
+      "path": "src/components/NoticePopup.tsx",
+      "accessCount": 4,
+      "lastAccessed": 1778290245921,
+      "type": "file"
+    },
+    {
+      "path": "src/hooks/useUserRole.ts",
+      "accessCount": 4,
+      "lastAccessed": 1778294978575,
       "type": "file"
     },
     {
@@ -231,21 +285,33 @@
       "type": "file"
     },
     {
-      "path": "src/app/tickets/page.tsx",
-      "accessCount": 2,
-      "lastAccessed": 1775998943388,
+      "path": "src/app/admin/users/actions.ts",
+      "accessCount": 3,
+      "lastAccessed": 1778295230417,
       "type": "file"
     },
     {
-      "path": "src/app/admin/users/page.tsx",
+      "path": "src/lib/supabase.ts",
       "accessCount": 2,
-      "lastAccessed": 1775998961275,
+      "lastAccessed": 1778294980991,
       "type": "file"
     },
     {
-      "path": "src/components/NotificationBell.tsx",
+      "path": "update_db_multi_rooms.sql",
       "accessCount": 2,
-      "lastAccessed": 1776351155824,
+      "lastAccessed": 1778294981100,
+      "type": "file"
+    },
+    {
+      "path": "update_db_reservation_alerts.sql",
+      "accessCount": 2,
+      "lastAccessed": 1778294981494,
+      "type": "file"
+    },
+    {
+      "path": "src/middleware.ts",
+      "accessCount": 2,
+      "lastAccessed": 1778295247322,
       "type": "file"
     },
     {
@@ -276,12 +342,6 @@
       "path": "src/lib/utils.ts",
       "accessCount": 1,
       "lastAccessed": 1776001618296,
-      "type": "file"
-    },
-    {
-      "path": "src/lib/supabase.ts",
-      "accessCount": 1,
-      "lastAccessed": 1776001618790,
       "type": "file"
     },
     {
@@ -324,6 +384,48 @@
       "path": "src/components/ui/popover.tsx",
       "accessCount": 1,
       "lastAccessed": 1776176398262,
+      "type": "file"
+    },
+    {
+      "path": "src/components/providers.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1778254965952,
+      "type": "file"
+    },
+    {
+      "path": "modify.py",
+      "accessCount": 1,
+      "lastAccessed": 1778294981932,
+      "type": "file"
+    },
+    {
+      "path": "rewrite_form.py",
+      "accessCount": 1,
+      "lastAccessed": 1778294981941,
+      "type": "file"
+    },
+    {
+      "path": "fix_sidebar_profile.sql",
+      "accessCount": 1,
+      "lastAccessed": 1778295018292,
+      "type": "file"
+    },
+    {
+      "path": "setup_roles.sql",
+      "accessCount": 1,
+      "lastAccessed": 1778295135292,
+      "type": "file"
+    },
+    {
+      "path": "fix_db.sql",
+      "accessCount": 1,
+      "lastAccessed": 1778295139836,
+      "type": "file"
+    },
+    {
+      "path": "secure_rls_policies.sql",
+      "accessCount": 1,
+      "lastAccessed": 1778295182805,
       "type": "file"
     }
   ],

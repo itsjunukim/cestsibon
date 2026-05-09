@@ -111,12 +111,12 @@ export function ReservationAlertDialog({ reservationId }: ReservationAlertDialog
                 <Button
                     type="button"
                     variant="outline"
-                    className="w-full h-11 border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 font-semibold"
+                    className="h-8 px-3 text-xs font-semibold border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-700 shadow-sm rounded-md"
                 >
-                    <BellPlus className="mr-2 h-4 w-4" />
+                    <BellPlus className="mr-1.5 h-3.5 w-3.5" />
                     맞춤 알림 관리
                     {activeCount > 0 && (
-                        <span className="ml-2 inline-flex items-center justify-center rounded-full bg-amber-600 text-white text-[11px] font-bold h-5 min-w-5 px-1.5">
+                        <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-amber-600 text-white text-[10px] font-bold h-4 min-w-4 px-1">
                             {activeCount}
                         </span>
                     )}

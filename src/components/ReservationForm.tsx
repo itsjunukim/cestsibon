@@ -60,9 +60,31 @@ const formSchema = z.object({
 
 type ReservationFormValues = z.infer<typeof formSchema>
 
+export interface ReservationData {
+    id: string
+    reservation_type?: 'accommodation' | 'day' | null
+    status?: string | null
+    customer_name?: string | null
+    phone?: string | null
+    date?: string | Date | null
+    headcount?: number | string | null
+    total_amount?: number | string | null
+    deposit?: number | string | null
+    balance_payment_method?: string | null
+    is_deposit_paid?: boolean | null
+    deposit_paid_date?: string | Date | null
+    is_visited?: boolean | null
+    notes?: string | null
+    accommodation_id?: string | null
+    reservation_rooms?: { room_id: string }[] | null
+    reservation_tickets?: { ticket_id: string; quantity: number }[] | null
+    pickup_location?: string | null
+    pickup_time?: string | null
+}
+
 interface ReservationFormProps {
     onSuccess?: () => void
-    initialData?: any
+    initialData?: ReservationData
 }
 
 export function ReservationForm({ onSuccess, initialData }: ReservationFormProps) {
@@ -304,9 +326,9 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
 
     return (
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className={typeSelected ? "grid grid-cols-1 lg:grid-cols-[1fr_400px] xl:grid-cols-[1.5fr_1fr] gap-8 w-full" : "w-full"}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="w-full">
                 {/* Reservation Type Selector */}
-                <div className={typeSelected ? "lg:col-span-2" : ""}>
+                <div className="w-full">
                     {!typeSelected ? (
                         <div className="max-w-lg mx-auto py-12">
                             <p className="text-center text-sm tracking-[0.15em] text-slate-500 mb-8">예약 유형 선택</p>
@@ -336,43 +358,59 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                             </div>
                         </div>
                     ) : (
-                        <div className="flex items-center gap-3 mb-4">
-                            <span className="text-xs font-semibold text-slate-500 shrink-0">예약 유형</span>
-                            <div className="inline-flex items-center bg-slate-100 p-1 rounded-lg gap-1">
-                                <button
-                                    type="button"
-                                    onClick={() => form.setValue("reservation_type", "day")}
-                                    className={cn(
-                                        "flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-sm font-semibold transition-all",
-                                        form.watch("reservation_type") === "day"
-                                            ? "bg-white shadow-sm text-orange-700 ring-1 ring-orange-100"
-                                            : "text-slate-500 hover:text-slate-700"
-                                    )}
-                                >
-                                    <span>☀️</span>
-                                    <span>당일</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => form.setValue("reservation_type", "accommodation")}
-                                    className={cn(
-                                        "flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-sm font-semibold transition-all",
-                                        form.watch("reservation_type") === "accommodation"
-                                            ? "bg-white shadow-sm text-indigo-700 ring-1 ring-indigo-100"
-                                            : "text-slate-500 hover:text-slate-700"
-                                    )}
-                                >
-                                    <span>🌙</span>
-                                    <span>숙박</span>
-                                </button>
+                        <div className="flex items-center justify-start gap-6 mb-4">
+                            <div className="flex items-center gap-3">
+                                <span className="text-xs font-semibold text-slate-500 shrink-0">예약 유형</span>
+                                <div className="inline-flex items-center bg-slate-100 p-1 rounded-lg gap-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => form.setValue("reservation_type", "day")}
+                                        className={cn(
+                                            "flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-sm font-semibold transition-all",
+                                            form.watch("reservation_type") === "day"
+                                                ? "bg-white shadow-sm text-orange-700 ring-1 ring-orange-100"
+                                                : "text-slate-500 hover:text-slate-700"
+                                        )}
+                                    >
+                                        <span>☀️</span>
+                                        <span>당일</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => form.setValue("reservation_type", "accommodation")}
+                                        className={cn(
+                                            "flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-sm font-semibold transition-all",
+                                            form.watch("reservation_type") === "accommodation"
+                                                ? "bg-white shadow-sm text-indigo-700 ring-1 ring-indigo-100"
+                                                : "text-slate-500 hover:text-slate-700"
+                                        )}
+                                    >
+                                        <span>🌙</span>
+                                        <span>숙박</span>
+                                    </button>
+                                </div>
                             </div>
+                            
+                            {initialData?.id && (
+                                <div className="flex items-center gap-4">
+                                    <div className="w-px h-6 bg-slate-200"></div>
+                                    <ReservationAlertDialog reservationId={initialData.id} />
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
 
-                {/* Left Column - Reservation Data */}
+                {/* 2-Column Layout */}
                 {typeSelected && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 content-start min-w-0">
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-stretch w-full">
+                    {/* Left Column - Reservation Data */}
+                    <div className="flex flex-col min-w-0 bg-white p-6 rounded-2xl border border-slate-300 shadow-sm shadow-slate-200/50 h-full relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-slate-800"></div>
+                        <div className="border-b border-slate-200 pb-3 mb-5 mt-1">
+                            <h3 className="font-bold text-slate-900 text-[17px] flex items-center gap-2">📝 기본 예약 정보</h3>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1 content-start">
                 <FormField
                     control={form.control}
                     name="date"
@@ -465,6 +503,64 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                             <FormMessage />
                         </FormItem>
                     )}
+                />
+
+                <FormField
+                    control={form.control}
+                    name="pickup_location"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>픽업 위치</FormLabel>
+                            <FormControl>
+                                <Input placeholder="픽업 장소 입력" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+
+                <FormField
+                    control={form.control}
+                    name="pickup_time"
+                    render={({ field }) => {
+                        const val = field.value || ""
+                        const [hour, minute] = val.includes(":") ? val.split(":") : ["", ""]
+                        return (
+                            <FormItem>
+                                <FormLabel>픽업 시간</FormLabel>
+                                <div className="flex space-x-2">
+                                    <Select 
+                                        value={hour} 
+                                        onValueChange={(h) => field.onChange(`${h}:${minute || "00"}`)}
+                                    >
+                                        <FormControl>
+                                            <SelectTrigger><SelectValue placeholder="시" /></SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent className="max-h-56">
+                                            {Array.from({length: 24}).map((_, i) => {
+                                                const h = i.toString().padStart(2, '0')
+                                                return <SelectItem key={h} value={h}>{h}시</SelectItem>
+                                            })}
+                                        </SelectContent>
+                                    </Select>
+                                    <Select 
+                                        value={minute} 
+                                        onValueChange={(m) => field.onChange(`${hour || "15"}:${m}`)}
+                                    >
+                                        <FormControl>
+                                            <SelectTrigger><SelectValue placeholder="분" /></SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent className="max-h-56">
+                                            {["00", "10", "20", "30", "40", "50"].map((m) => (
+                                                <SelectItem key={m} value={m}>{m}분</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <FormMessage />
+                            </FormItem>
+                        )
+                    }}
                 />
 
                 {form.watch("reservation_type") === "accommodation" && (
@@ -564,35 +660,37 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                 )}
 
                 <div className="col-span-full space-y-4">
-                    <div>
-                        <FormLabel className="mb-2 block">이용권</FormLabel>
-                        <Select onValueChange={(val) => {
-                            const st = form.getValues("selected_tickets") || [];
-                            if (val && !st.find(s => s.ticket_id === val)) {
-                                form.setValue("selected_tickets", [...st, { ticket_id: val, quantity: 1 }]);
-                                const t = tickets?.find((x: any) => x.id === val);
-                                if (t) {
-                                    const currentTotal = Number(String(form.getValues("total_amount")).replace(/[^0-9]/g, '')) || 0;
-                                    form.setValue("total_amount", String(currentTotal + Number(t.price)));
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <FormLabel className="mb-2 block">이용권</FormLabel>
+                            <Select onValueChange={(val) => {
+                                const st = form.getValues("selected_tickets") || [];
+                                if (val && !st.find(s => s.ticket_id === val)) {
+                                    form.setValue("selected_tickets", [...st, { ticket_id: val, quantity: 1 }]);
+                                    const t = tickets?.find((x: any) => x.id === val);
+                                    if (t) {
+                                        const currentTotal = Number(String(form.getValues("total_amount")).replace(/[^0-9]/g, '')) || 0;
+                                        form.setValue("total_amount", String(currentTotal + Number(t.price)));
+                                    }
                                 }
-                            }
-                        }}>
-                            <SelectTrigger className="w-full md:w-1/2 bg-white">
-                                <SelectValue placeholder="추가할 이용권을 선택하세요..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {tickets?.map((t: any) => {
-                                    const isAdded = (form.watch("selected_tickets") || []).find(s => s.ticket_id === t.id);
-                                    if (isAdded) return null; // Hide already added tickets from dropdown
-                                    return (
-                                        <SelectItem key={t.id} value={t.id}>
-                                            {t.name} ({Number(t.price).toLocaleString()}원)
-                                        </SelectItem>
-                                    )
-                                })}
-                                {!tickets?.length && <div className="text-sm text-slate-500 py-2 px-2">등록된 이용권이 없습니다.</div>}
-                            </SelectContent>
-                        </Select>
+                            }}>
+                                <SelectTrigger className="w-full bg-white">
+                                    <SelectValue placeholder="추가할 이용권을 선택하세요..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {tickets?.map((t: any) => {
+                                        const isAdded = (form.watch("selected_tickets") || []).find(s => s.ticket_id === t.id);
+                                        if (isAdded) return null; // Hide already added tickets from dropdown
+                                        return (
+                                            <SelectItem key={t.id} value={t.id}>
+                                                {t.name} ({Number(t.price).toLocaleString()}원)
+                                            </SelectItem>
+                                        )
+                                    })}
+                                    {!tickets?.length && <div className="text-sm text-slate-500 py-2 px-2">등록된 이용권이 없습니다.</div>}
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
 
                     {/* Selected Tickets Cards */}
@@ -639,70 +737,19 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                     </div>
                 </div>
 
-                <FormField
-                    control={form.control}
-                    name="pickup_location"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>픽업 위치</FormLabel>
-                            <FormControl>
-                                <Input placeholder="픽업 장소 입력" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
 
-                <FormField
-                    control={form.control}
-                    name="pickup_time"
-                    render={({ field }) => {
-                        const val = field.value || ""
-                        const [hour, minute] = val.includes(":") ? val.split(":") : ["", ""]
-                        return (
-                            <FormItem>
-                                <FormLabel>픽업 시간</FormLabel>
-                                <div className="flex space-x-2">
-                                    <Select 
-                                        value={hour} 
-                                        onValueChange={(h) => field.onChange(`${h}:${minute || "00"}`)}
-                                    >
-                                        <FormControl>
-                                            <SelectTrigger><SelectValue placeholder="시" /></SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent className="max-h-56">
-                                            {Array.from({length: 24}).map((_, i) => {
-                                                const h = i.toString().padStart(2, '0')
-                                                return <SelectItem key={h} value={h}>{h}시</SelectItem>
-                                            })}
-                                        </SelectContent>
-                                    </Select>
-                                    <Select 
-                                        value={minute} 
-                                        onValueChange={(m) => field.onChange(`${hour || "15"}:${m}`)}
-                                    >
-                                        <FormControl>
-                                            <SelectTrigger><SelectValue placeholder="분" /></SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent className="max-h-56">
-                                            {["00", "10", "20", "30", "40", "50"].map((m) => (
-                                                <SelectItem key={m} value={m}>{m}분</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <FormMessage />
-                            </FormItem>
-                        )
-                    }}
-                />
-
-                <div className="col-span-full border border-slate-200 bg-slate-50/50 rounded-md p-5 space-y-6 shadow-sm mt-4">
-                    <div className="flex justify-between items-center border-b border-slate-200 pb-3">
-                        <span className="text-slate-700 font-extrabold text-base">결제 및 요금 정보</span>
+                        </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Right Column - Payment & Settlement */}
+                    <div className="flex flex-col gap-5 min-w-0 h-full">
+                        <div className="w-full bg-white border border-blue-200 shadow-sm shadow-blue-100/50 rounded-2xl p-6 flex flex-col relative overflow-hidden">
+                            <div className="absolute top-0 left-0 w-full h-1 bg-blue-500"></div>
+                            <div className="border-b border-blue-100 pb-3 mb-5 mt-1">
+                                <h3 className="font-bold text-blue-800 text-[17px] flex items-center gap-2">💳 결제 및 요금 정보</h3>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* 예약금 파트 */}
                         <div className="space-y-4">
                             <FormField
@@ -855,44 +902,44 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                         </div>
                     </div>
 
-                    <div className="flex justify-center pt-4 border-t border-slate-200/80 mt-2">
+                    <div className="flex justify-center pt-4 border-t border-slate-200/80 mt-6">
                         <div className="grid grid-cols-3 gap-2">
-                            {/* Plus Row */}
-                            <Button type="button" variant="outline" className="h-10 px-0 text-sm font-bold bg-white text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-300 w-24 shadow-sm" onClick={() => {
-                                const current = Number(form.getValues('total_amount')) || 0;
-                                form.setValue('total_amount', String(current + 1000));
-                            }}>+1,000원</Button>
-                            <Button type="button" variant="outline" className="h-10 px-0 text-sm font-bold bg-white text-orange-600 hover:text-orange-700 hover:bg-orange-50 border-orange-300 w-24 shadow-sm" onClick={() => {
-                                const current = Number(form.getValues('total_amount')) || 0;
-                                form.setValue('total_amount', String(current + 5000));
-                            }}>+5,000원</Button>
-                            <Button type="button" variant="outline" className="h-10 px-0 text-sm font-bold bg-white text-green-600 hover:text-green-700 hover:bg-green-50 border-green-300 w-24 shadow-sm" onClick={() => {
-                                const current = Number(form.getValues('total_amount')) || 0;
-                                form.setValue('total_amount', String(current + 10000));
-                            }}>+10,000원</Button>
-                            
-                            {/* Minus Row */}
-                            <Button type="button" variant="outline" className="h-10 px-0 text-sm font-bold bg-white text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-300 w-24 shadow-sm" onClick={() => {
-                                const current = Number(form.getValues('total_amount')) || 0;
-                                form.setValue('total_amount', String(Math.max(0, current - 1000)));
-                            }}>-1,000원</Button>
-                            <Button type="button" variant="outline" className="h-10 px-0 text-sm font-bold bg-white text-orange-600 hover:text-orange-700 hover:bg-orange-50 border-orange-300 w-24 shadow-sm" onClick={() => {
-                                const current = Number(form.getValues('total_amount')) || 0;
-                                form.setValue('total_amount', String(Math.max(0, current - 5000)));
-                            }}>-5,000원</Button>
-                            <Button type="button" variant="outline" className="h-10 px-0 text-sm font-bold bg-white text-green-600 hover:text-green-700 hover:bg-green-50 border-green-300 w-24 shadow-sm" onClick={() => {
-                                const current = Number(form.getValues('total_amount')) || 0;
-                                form.setValue('total_amount', String(Math.max(0, current - 10000)));
-                            }}>-10,000원</Button>
+                            {([1, -1] as const).flatMap((sign) =>
+                                ([
+                                    [1000, 'text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-300'],
+                                    [5000, 'text-orange-600 hover:text-orange-700 hover:bg-orange-50 border-orange-300'],
+                                    [10000, 'text-green-600 hover:text-green-700 hover:bg-green-50 border-green-300'],
+                                ] as const).map(([amount, color]) => {
+                                    const delta = amount * sign
+                                    return (
+                                        <Button
+                                            key={delta}
+                                            type="button"
+                                            variant="outline"
+                                            className={cn(
+                                                "h-10 px-0 text-sm font-bold bg-white w-24 shadow-sm",
+                                                color
+                                            )}
+                                            onClick={() => {
+                                                const current = Number(form.getValues('total_amount')) || 0
+                                                form.setValue('total_amount', String(Math.max(0, current + delta)))
+                                            }}
+                                        >
+                                            {sign > 0 ? '+' : '-'}{amount.toLocaleString()}원
+                                        </Button>
+                                    )
+                                })
+                            )}
                         </div>
                     </div>
                 </div>
 
                 {/* 숙소 정산 금액 섹션 - 숙박 예약인 경우만 노출 */}
                 {form.watch("reservation_type") === "accommodation" && (
-                <div className="col-span-full border border-indigo-200 bg-indigo-50/30 rounded-md p-5 space-y-4 shadow-sm mt-4">
-                    <div className="flex justify-between items-center border-b border-indigo-200 pb-3">
-                        <span className="text-indigo-800 font-extrabold text-base">🏠 숙소 정산 금액</span>
+                <div className="w-full bg-white border border-indigo-200 shadow-sm shadow-indigo-100/50 rounded-2xl p-6 flex flex-col relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-indigo-500"></div>
+                    <div className="flex justify-between items-end border-b border-indigo-100 pb-3 mb-5 mt-1">
+                        <h3 className="font-bold text-indigo-800 text-[17px] flex items-center gap-2">🏠 숙소 정산 금액</h3>
                         <span className="text-xs text-indigo-500 font-medium">숙소에 정산할 금액을 입력하세요</span>
                     </div>
 
@@ -963,23 +1010,25 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
 
                     {/* 기타 사유 메모 - 기타 금액이 입력된 경우에만 노출 */}
                     {Number(String(form.watch("settlement_other") || "0").replace(/[^0-9]/g, '')) > 0 && (
-                        <FormField
-                            control={form.control}
-                            name="settlement_other_memo"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel className="font-bold text-slate-600 text-xs">기타 정산 사유</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="정산 사유를 간단히 입력하세요" className="bg-white text-sm" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                        <div className="mt-4">
+                            <FormField
+                                control={form.control}
+                                name="settlement_other_memo"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="font-bold text-slate-600 text-xs">기타 정산 사유</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="정산 사유를 간단히 입력하세요" className="bg-white text-sm" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
                     )}
 
                     {/* 정산 합계 */}
-                    <div className="flex justify-end items-center pt-3 border-t border-indigo-200">
+                    <div className="flex justify-end items-center pt-4 mt-6 border-t border-indigo-200">
                         <span className="text-sm font-bold text-slate-600 mr-3">정산 합계</span>
                         <span className="text-lg font-extrabold text-indigo-700">
                             {(() => {
@@ -994,20 +1043,19 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                 </div>
                 )}
 
-                </div>
-                )}
-
-                {typeSelected && (
-                <div className="flex flex-col h-full bg-slate-50 p-6 rounded-lg border border-slate-200 shadow-sm lg:sticky top-0">
+                {/* Bottom Section - Memo & Submit */}
+                <div className="w-full flex flex-col flex-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="border-b border-slate-100 pb-3 mb-5">
+                        <h3 className="font-bold text-slate-800 text-[17px] flex items-center gap-2">🗒️ 메모</h3>
+                    </div>
                     <FormField
                         control={form.control}
                         name="notes"
                         render={({ field }) => (
-                            <FormItem className="flex-1 flex flex-col mb-8">
-                                <FormLabel className="font-bold text-slate-800 text-base mb-2">메모</FormLabel>
-                                <FormControl className="flex-1 min-h-[300px]">
+                            <FormItem className="w-full flex-1 flex flex-col">
+                                <FormControl className="flex-1">
                                     <Textarea 
-                                        className="resize-none h-full bg-white text-base shadow-inner border-slate-300 focus-visible:ring-indigo-500 p-4" 
+                                        className="resize-none h-full min-h-[120px] bg-slate-50 text-base shadow-inner border-slate-200 focus-visible:ring-indigo-500 p-4 rounded-xl" 
                                         placeholder="메모 사항 입력..." 
                                         {...field} 
                                     />
@@ -1016,18 +1064,19 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                             </FormItem>
                         )}
                     />
-
-                    {initialData?.id && (
-                        <div className="mb-3">
-                            <ReservationAlertDialog reservationId={initialData.id} />
-                        </div>
-                    )}
-
-                    <Button type="submit" disabled={!isAdmin || isLoading} className="w-full h-14 text-[18px] font-bold shadow-md hover:shadow-lg transition-all bg-indigo-600 hover:bg-indigo-700 text-white mt-auto">
-                        {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-                        {initialData ? "예약 정보 수정" : "새 예약 저장"}
-                    </Button>
                 </div>
+                    </div>
+                </div>
+                )}
+
+                {/* Submit Button Centered */}
+                {typeSelected && (
+                    <div className="flex justify-center w-full mt-4">
+                        <Button type="submit" disabled={!isAdmin || isLoading} className="w-full md:w-1/3 h-14 text-[18px] font-bold shadow-md hover:shadow-lg transition-all bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl">
+                            {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+                            {initialData ? "예약 정보 수정" : "새 예약 저장"}
+                        </Button>
+                    </div>
                 )}
             </form>
         </Form>

@@ -1,0 +1,3 @@
+ALTER TABLE accommodation_settlements
+ADD COLUMN IF NOT EXISTS is_paid BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN IF NOT EXISTS paid_date DATE;

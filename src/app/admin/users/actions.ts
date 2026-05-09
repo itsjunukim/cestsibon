@@ -1,9 +1,46 @@
 'use server'
 
 import { createClient } from '@supabase/supabase-js'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 
+async function requireAdmin() {
+    const cookieStore = await cookies()
+    const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+            cookies: {
+                getAll() {
+                    return cookieStore.getAll()
+                },
+                setAll() {
+                    // server action: 쿠키 set 불필요
+                },
+            },
+        }
+    )
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+        return { ok: false as const, error: '인증이 필요합니다.' }
+    }
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+    if (profile?.role !== 'admin') {
+        return { ok: false as const, error: '관리자 권한이 필요합니다.' }
+    }
+    return { ok: true as const, user }
+}
+
 export async function createUser(prevState: any, formData: FormData) {
+    const auth = await requireAdmin()
+    if (!auth.ok) return { error: auth.error }
+
     const email = formData.get('email') as string
     const password = formData.get('password') as string
     const role = formData.get('role') as string || 'employee'
@@ -29,7 +66,7 @@ export async function createUser(prevState: any, formData: FormData) {
         email,
         password,
         email_confirm: true,
-        user_metadata: { name, phone } // Store in metadata as backup
+        user_metadata: { name, phone }
     })
 
     if (error) {
@@ -37,8 +74,6 @@ export async function createUser(prevState: any, formData: FormData) {
     }
 
     if (data.user) {
-        // Trigger might have created the row, or we upsert.
-        // We update name, phone, and role.
         const { error: profileError } = await supabase
             .from('profiles')
             .update({
@@ -48,14 +83,8 @@ export async function createUser(prevState: any, formData: FormData) {
             })
             .eq('id', data.user.id)
 
-        // If trigger didn't run yet or failed, we might need to insert. 
-        // But usually update is fine if trigger works. 
-        // If update affects 0 rows, we might simply retry or Insert.
-        // For simplicity assuming trigger runs fast or we upsert.
-
         if (profileError) {
             console.error("Error setting profile", profileError)
-            // Fallback: try upsert if update failed (though update shouldn't fail if row exists)
             const { error: upsertError } = await supabase.from('profiles').upsert({
                 id: data.user.id,
                 email: email,
@@ -75,8 +104,15 @@ export async function createUser(prevState: any, formData: FormData) {
 }
 
 export async function deleteUser(userId: string) {
+    const auth = await requireAdmin()
+    if (!auth.ok) return { error: auth.error }
+
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
         return { error: '서버 키 없음' }
+    }
+
+    if (auth.user.id === userId) {
+        return { error: '본인 계정은 삭제할 수 없습니다.' }
     }
 
     const supabase = createClient(
