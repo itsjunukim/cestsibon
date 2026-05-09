@@ -602,7 +602,7 @@ function ReservationsContent() {
                                         </TableCell>
                                     )}
                                     {visibleColumns.payment && (() => {
-                                        const settled = res.status === 'completed' && res.balance_payment_method && res.balance_payment_method !== 'none'
+                                        const settled = !!res.balance_payment_method && res.balance_payment_method !== 'none'
                                         const methodLabel = res.balance_payment_method === 'transfer' ? '이체' : res.balance_payment_method === 'card' ? '카드' : res.balance_payment_method === 'cash' ? '현금' : res.balance_payment_method === 'place' ? '플레이스' : res.balance_payment_method === 'store' ? '스토어' : res.balance_payment_method === 'social' ? '소셜' : null
                                         return (
                                         <TableCell className="whitespace-nowrap">
