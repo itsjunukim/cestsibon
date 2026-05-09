@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input"
 import { createClient } from "@/lib/supabase"
 import { useQueryClient } from "@tanstack/react-query"
 import { Loader2 } from "lucide-react"
+import { useUserRole } from "@/hooks/useUserRole"
 import { useState } from "react"
 
 const formSchema = z.object({
@@ -29,6 +30,7 @@ interface TicketFormProps {
 }
 
 export function TicketForm({ onSuccess, initialData }: TicketFormProps) {
+    const { isAdmin } = useUserRole()
     const [isLoading, setIsLoading] = useState(false)
     const queryClient = useQueryClient()
     const supabase = createClient()
@@ -122,7 +124,7 @@ export function TicketForm({ onSuccess, initialData }: TicketFormProps) {
                         </FormItem>
                     )}
                 />
-                <Button type="submit" disabled={isLoading} className="w-full">
+                <Button type="submit" disabled={!isAdmin || isLoading} className="w-full">
                     {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     {initialData ? "수정 완료" : "이용권 저장"}
                 </Button>

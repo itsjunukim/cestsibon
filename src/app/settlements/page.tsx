@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useUserRole } from "@/hooks/useUserRole"
 import { createClient } from "@/lib/supabase"
 import { format, startOfMonth, endOfMonth, subMonths, addMonths } from "date-fns"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -15,6 +16,7 @@ import { cn } from "@/lib/utils"
 import { ko } from "date-fns/locale"
 
 export default function SettlementsPage() {
+    const { isAdmin } = useUserRole()
     const supabase = createClient()
     const [currentDate, setCurrentDate] = useState(new Date())
     const [settlementsData, setSettlementsData] = useState<any[]>([])
@@ -223,8 +225,9 @@ export default function SettlementsPage() {
                                             </TableCell>
                                             <TableCell className="text-center align-middle">
                                                 <div className="flex justify-center">
-                                                        <Checkbox 
+                                                        <Checkbox
                                                         checked={data.is_paid}
+                                                        disabled={!isAdmin}
                                                         onCheckedChange={(checked) => {
                                                             const isPaid = !!checked;
                                                             const newDate = isPaid && !data.paid_date ? format(new Date(), "yyyy-MM-dd") : (!isPaid ? null : data.paid_date);
@@ -243,6 +246,7 @@ export default function SettlementsPage() {
                                                         <PopoverTrigger asChild>
                                                             <Button
                                                                 variant={"outline"}
+                                                                disabled={!isAdmin}
                                                                 className={cn("w-[130px] h-9 bg-white px-3 text-left font-normal border-green-200 shadow-sm", !data.paid_date && "text-muted-foreground")}
                                                             >
                                                                 {data.paid_date ? (

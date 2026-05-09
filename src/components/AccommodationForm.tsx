@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { createClient } from "@/lib/supabase"
 import { useQueryClient } from "@tanstack/react-query"
 import { Loader2, Plus, Trash2 } from "lucide-react"
+import { useUserRole } from "@/hooks/useUserRole"
 import { useState } from "react"
 
 const formSchema = z.object({
@@ -38,6 +39,7 @@ interface AccommodationFormProps {
 }
 
 export function AccommodationForm({ onSuccess, initialData }: AccommodationFormProps) {
+    const { isAdmin } = useUserRole()
     const [isLoading, setIsLoading] = useState(false)
     const queryClient = useQueryClient()
     const supabase = createClient()
@@ -237,7 +239,7 @@ export function AccommodationForm({ onSuccess, initialData }: AccommodationFormP
                     </div>
                 </div>
 
-                <Button type="submit" disabled={isLoading} className="w-full">
+                <Button type="submit" disabled={!isAdmin || isLoading} className="w-full">
                     {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     숙소 저장
                 </Button>

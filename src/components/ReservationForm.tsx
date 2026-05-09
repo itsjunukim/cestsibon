@@ -16,7 +16,8 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase"
 import { useQueryClient, useQuery } from "@tanstack/react-query"
-import { Loader2 } from "lucide-react"
+import { Loader2, Sun, Moon } from "lucide-react"
+import { useUserRole } from "@/hooks/useUserRole"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useState, useEffect, useRef } from "react"
 import { Calendar } from "@/components/ui/calendar"
@@ -26,6 +27,7 @@ import { ko } from "date-fns/locale"
 import { CalendarIcon, X } from "lucide-react"
 import { cn, formatPhone } from "@/lib/utils"
 import { Textarea } from "@/components/ui/textarea"
+import { ReservationAlertDialog } from "@/components/ReservationAlertDialog"
 
 const formSchema = z.object({
     reservation_type: z.enum(["accommodation", "day"]),
@@ -38,7 +40,7 @@ const formSchema = z.object({
         quantity: z.number().min(1)
     })).optional(),
     accommodation_id: z.string().optional(),
-    room_id: z.string().optional(),
+    selected_rooms: z.array(z.string()).optional(),
     pickup_location: z.string().optional(),
     pickup_time: z.string().optional(),
     total_amount: z.string(), // Changed to string
@@ -64,8 +66,10 @@ interface ReservationFormProps {
 }
 
 export function ReservationForm({ onSuccess, initialData }: ReservationFormProps) {
+    const { isAdmin } = useUserRole()
     const [isLoading, setIsLoading] = useState(false)
-    const [isCalendarOpen, setIsCalendarOpen] = useState(false) // State for Calendar Popover
+    const [isCalendarOpen, setIsCalendarOpen] = useState(false)
+    const [typeSelected, setTypeSelected] = useState(!!initialData)
     const queryClient = useQueryClient()
     const supabase = createClient()
 
@@ -120,8 +124,10 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
             is_visited: initialData?.is_visited || false,
             notes: initialData?.notes || "",
             accommodation_id: initialData?.accommodation_id || "",
-            room_id: initialData?.room_id || "",
-            selected_tickets: initialData?.reservation_tickets 
+            selected_rooms: initialData?.reservation_rooms
+                ? initialData.reservation_rooms.map((rr: any) => rr.room_id)
+                : [],
+            selected_tickets: initialData?.reservation_tickets
                 ? initialData.reservation_tickets.map((rt: any) => ({
                       ticket_id: rt.ticket_id,
                       quantity: rt.quantity
@@ -138,24 +144,27 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
 
     const selectedAccommodationId = form.watch("accommodation_id")
 
-    const { data: rooms } = useQuery({
-        queryKey: ["rooms", selectedAccommodationId],
+    const { data: allRooms } = useQuery({
+        queryKey: ["all-rooms"],
         queryFn: async () => {
-            if (!selectedAccommodationId) return []
-            const { data } = await supabase.from("rooms").select("id, name").eq("accommodation_id", selectedAccommodationId).order("name")
+            const { data } = await supabase
+                .from("rooms")
+                .select("id, name, accommodation_id, accommodations(name)")
+                .order("name")
             return data || []
-        },
-        enabled: !!selectedAccommodationId,
+        }
     })
 
-    // 숙소가 바뀌면 방 선택 초기화
+    const filteredRooms = allRooms?.filter((r: any) => r.accommodation_id === selectedAccommodationId) || []
+
+    // 숙소가 바뀌면 개별 room_id(단일선택용 레거시)만 초기화하고, 다중 선택 목록인 selected_rooms는 유지합니다.
     const prevAccIdRef = useRef(initialData?.accommodation_id || "");
     useEffect(() => {
         if (selectedAccommodationId === prevAccIdRef.current) {
             return;
         }
         prevAccIdRef.current = selectedAccommodationId || "";
-        form.setValue("room_id", "");
+        form.setValue("selected_rooms", []);
     }, [selectedAccommodationId, form])
 
     // 정산 데이터가 로드되면 폼에 반영
@@ -183,7 +192,7 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
     async function onSubmit(values: z.infer<typeof formSchema>) {
         setIsLoading(true)
         try {
-            const { selected_tickets, settlement_accommodation, settlement_meat, settlement_other, settlement_other_memo, ...reservationData } = values;
+            const { selected_tickets, selected_rooms, settlement_accommodation, settlement_meat, settlement_other, settlement_other_memo, ...reservationData } = values;
 
             const formattedValues = {
                 ...reservationData,
@@ -197,7 +206,7 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                 deposit_paid_date: reservationData.deposit_paid_date ? format(reservationData.deposit_paid_date, "yyyy-MM-dd") : null,
                 is_visited: reservationData.is_visited || false,
                 accommodation_id: reservationData.accommodation_id === "" ? null : reservationData.accommodation_id,
-                room_id: reservationData.room_id === "" ? null : reservationData.room_id,
+                room_id: null,
             }
 
             let error;
@@ -223,6 +232,14 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
             if (error) throw error;
 
             if (currentReservationId) {
+                await supabase.from("reservation_rooms").delete().eq("reservation_id", currentReservationId);
+                const validRooms = (selected_rooms || []).filter(Boolean);
+                if (validRooms.length > 0) {
+                    await supabase.from("reservation_rooms").insert(
+                        validRooms.map(roomId => ({ reservation_id: currentReservationId, room_id: roomId }))
+                    );
+                }
+
                 await supabase.from("reservation_tickets").delete().eq("reservation_id", currentReservationId);
                 const validTickets = (selected_tickets || []).filter(t => t.quantity > 0);
                 if (validTickets.length > 0) {
@@ -287,33 +304,75 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
 
     return (
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-1 lg:grid-cols-[1fr_400px] xl:grid-cols-[1.5fr_1fr] gap-8 w-full">
-                {/* Left Column - Reservation Data */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 content-start min-w-0">
-                    <div className="col-span-full">
-                    <FormField
-                        control={form.control}
-                        name="reservation_type"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>예약 유형</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl>
-                                        <SelectTrigger className="w-fit">
-                                            <SelectValue placeholder="유형 선택" />
-                                        </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                        <SelectItem value="accommodation">숙박</SelectItem>
-                                        <SelectItem value="day">당일</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
+            <form onSubmit={form.handleSubmit(onSubmit)} className={typeSelected ? "grid grid-cols-1 lg:grid-cols-[1fr_400px] xl:grid-cols-[1.5fr_1fr] gap-8 w-full" : "w-full"}>
+                {/* Reservation Type Selector */}
+                <div className={typeSelected ? "lg:col-span-2" : ""}>
+                    {!typeSelected ? (
+                        <div className="max-w-lg mx-auto py-12">
+                            <p className="text-center text-sm tracking-[0.15em] text-slate-500 mb-8">예약 유형 선택</p>
+                            <div className="grid grid-cols-2 rounded-2xl overflow-hidden shadow-md">
+                                <button
+                                    type="button"
+                                    onClick={() => { form.setValue("reservation_type", "day"); setTypeSelected(true); }}
+                                    className="group flex flex-col items-center justify-center gap-5 px-8 py-20 bg-stone-50 hover:bg-amber-50 border border-r-0 border-stone-200 rounded-l-2xl transition-colors duration-300"
+                                >
+                                    <Sun className="h-8 w-8 text-amber-400 transition-transform duration-300 group-hover:scale-110" strokeWidth={1.5} />
+                                    <div className="space-y-0.5 text-center">
+                                        <p className="text-[9px] tracking-[0.2em] text-slate-400 uppercase">Day</p>
+                                        <p className="text-base font-semibold tracking-wide text-slate-700">당일</p>
+                                    </div>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => { form.setValue("reservation_type", "accommodation"); setTypeSelected(true); }}
+                                    className="group flex flex-col items-center justify-center gap-5 px-8 py-20 bg-slate-900 hover:bg-slate-800 rounded-r-2xl transition-colors duration-300"
+                                >
+                                    <Moon className="h-8 w-8 text-slate-300 transition-transform duration-300 group-hover:scale-110" strokeWidth={1.5} />
+                                    <div className="space-y-0.5 text-center">
+                                        <p className="text-[9px] tracking-[0.2em] text-slate-500 uppercase">Night</p>
+                                        <p className="text-base font-semibold tracking-wide text-white">숙박</p>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-3 mb-4">
+                            <span className="text-xs font-semibold text-slate-500 shrink-0">예약 유형</span>
+                            <div className="inline-flex items-center bg-slate-100 p-1 rounded-lg gap-1">
+                                <button
+                                    type="button"
+                                    onClick={() => form.setValue("reservation_type", "day")}
+                                    className={cn(
+                                        "flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-sm font-semibold transition-all",
+                                        form.watch("reservation_type") === "day"
+                                            ? "bg-white shadow-sm text-orange-700 ring-1 ring-orange-100"
+                                            : "text-slate-500 hover:text-slate-700"
+                                    )}
+                                >
+                                    <span>☀️</span>
+                                    <span>당일</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => form.setValue("reservation_type", "accommodation")}
+                                    className={cn(
+                                        "flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-sm font-semibold transition-all",
+                                        form.watch("reservation_type") === "accommodation"
+                                            ? "bg-white shadow-sm text-indigo-700 ring-1 ring-indigo-100"
+                                            : "text-slate-500 hover:text-slate-700"
+                                    )}
+                                >
+                                    <span>🌙</span>
+                                    <span>숙박</span>
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
+                {/* Left Column - Reservation Data */}
+                {typeSelected && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 content-start min-w-0">
                 <FormField
                     control={form.control}
                     name="date"
@@ -409,73 +468,99 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                 />
 
                 {form.watch("reservation_type") === "accommodation" && (
-                <FormField
-                    control={form.control}
-                    name="accommodation_id"
-                    render={({ field }) => (
-                        <FormItem className="min-w-0">
-                            <FormLabel>숙소</FormLabel>
-                            <Select
-                                onValueChange={(val) => field.onChange(val === "__none__" ? "" : val)}
-                                value={field.value || ""}
-                            >
-                                <FormControl>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="숙소 선택" />
-                                    </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                    <SelectItem value="__none__">선택 안함</SelectItem>
-                                    {accommodations?.map((acc: any) => (
-                                        <SelectItem key={acc.id} value={acc.id}>
-                                            {acc.name}
-                                        </SelectItem>
-                                    ))}
-                                    {(!accommodations || accommodations.length === 0) && (
-                                        <SelectItem value="mock-id">길조호텔 (예시)</SelectItem>
-                                    )}
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                )}
+                <div className="col-span-full space-y-3">
+                    {/* 숙소 + 방 종류 드롭다운 동일 행 */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormField
+                            control={form.control}
+                            name="accommodation_id"
+                            render={({ field }) => (
+                                <FormItem className="min-w-0">
+                                    <FormLabel>숙소</FormLabel>
+                                    <Select
+                                        onValueChange={(val) => field.onChange(val === "__none__" ? "" : val)}
+                                        value={field.value || ""}
+                                    >
+                                        <FormControl>
+                                            <SelectTrigger className="h-10 bg-white">
+                                                <SelectValue placeholder="숙소 선택" />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            <SelectItem value="__none__">선택 안함</SelectItem>
+                                            {accommodations?.map((acc: any) => (
+                                                <SelectItem key={acc.id} value={acc.id}>
+                                                    {acc.name}
+                                                </SelectItem>
+                                            ))}
+                                            {(!accommodations || accommodations.length === 0) && (
+                                                <SelectItem value="mock-id">길조호텔 (예시)</SelectItem>
+                                            )}
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
 
-                {form.watch("reservation_type") === "accommodation" && (
-                <FormField
-                    control={form.control}
-                    name="room_id"
-                    render={({ field }) => (
-                        <FormItem className="min-w-0">
-                            <FormLabel>방 종류</FormLabel>
+                        <div className="min-w-0">
+                            <FormLabel className="mb-2 block">방 종류</FormLabel>
                             <Select
-                                onValueChange={(val) => field.onChange(val === "__none__" ? "" : val)}
-                                value={field.value ? String(field.value) : ""}
                                 disabled={!selectedAccommodationId}
+                                onValueChange={(val) => {
+                                    const sr = form.getValues("selected_rooms") || [];
+                                    if (val && !sr.includes(val)) {
+                                        form.setValue("selected_rooms", [...sr, val]);
+                                    }
+                                }}
                             >
-                                <FormControl>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder={selectedAccommodationId ? "방 종류 선택" : "숙소를 먼저 선택하세요"} />
-                                    </SelectTrigger>
-                                </FormControl>
+                                <SelectTrigger className="h-10 w-full bg-white">
+                                    <SelectValue placeholder={selectedAccommodationId ? "추가할 방을 선택하세요..." : "숙소를 먼저 선택하세요"} />
+                                </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="__none__">선택 안함</SelectItem>
-                                    {rooms && rooms.length > 0 ? (
-                                        rooms.map((room: any) => (
-                                            <SelectItem key={room.id} value={String(room.id)}>
+                                    {filteredRooms?.map((room: any) => {
+                                        const isAdded = (form.watch("selected_rooms") || []).includes(room.id);
+                                        if (isAdded) return null;
+                                        return (
+                                            <SelectItem key={room.id} value={room.id}>
                                                 {room.name}
                                             </SelectItem>
-                                        ))
-                                    ) : (
-                                        <div className="text-sm text-slate-500 py-2 px-2">등록된 방이 없습니다.</div>
-                                    )}
+                                        );
+                                    })}
+                                    {!filteredRooms?.length && <div className="text-sm text-slate-500 py-2 px-2">등록된 방이 없습니다.</div>}
                                 </SelectContent>
                             </Select>
-                            <FormMessage />
-                        </FormItem>
+                        </div>
+                    </div>
+
+                    {/* 선택된 방 카드 */}
+                    {(form.watch("selected_rooms") || []).length > 0 && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {(form.watch("selected_rooms") || []).map((roomId: string) => {
+                                const room = allRooms?.find((r: any) => r.id === roomId);
+                                if (!room) return null;
+                                return (
+                                    <div key={roomId} className="relative flex items-center justify-between bg-white px-4 py-3 border border-slate-200 rounded-md shadow-sm border-l-4 border-l-indigo-500">
+                                        <div className="font-semibold text-slate-800 text-sm">🛏 {room.name}</div>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            title="삭제"
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                                            onClick={() => {
+                                                const sr = form.getValues("selected_rooms") || [];
+                                                form.setValue("selected_rooms", sr.filter(id => id !== roomId));
+                                            }}
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     )}
-                />
+                </div>
                 )}
 
                 <div className="col-span-full space-y-4">
@@ -909,9 +994,10 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                 </div>
                 )}
 
-                </div> {/* End Left Column */}
+                </div>
+                )}
 
-                {/* Right Column - Notes & Submit */}
+                {typeSelected && (
                 <div className="flex flex-col h-full bg-slate-50 p-6 rounded-lg border border-slate-200 shadow-sm lg:sticky top-0">
                     <FormField
                         control={form.control}
@@ -931,11 +1017,18 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                         )}
                     />
 
-                    <Button type="submit" disabled={isLoading} className="w-full h-14 text-[18px] font-bold shadow-md hover:shadow-lg transition-all bg-indigo-600 hover:bg-indigo-700 text-white mt-auto">
+                    {initialData?.id && (
+                        <div className="mb-3">
+                            <ReservationAlertDialog reservationId={initialData.id} />
+                        </div>
+                    )}
+
+                    <Button type="submit" disabled={!isAdmin || isLoading} className="w-full h-14 text-[18px] font-bold shadow-md hover:shadow-lg transition-all bg-indigo-600 hover:bg-indigo-700 text-white mt-auto">
                         {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
                         {initialData ? "예약 정보 수정" : "새 예약 저장"}
                     </Button>
                 </div>
+                )}
             </form>
         </Form>
     )

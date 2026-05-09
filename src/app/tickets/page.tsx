@@ -1,6 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
+import { useUserRole } from "@/hooks/useUserRole"
 import {
     Card,
     CardContent,
@@ -55,9 +56,10 @@ interface SortableTicketRowProps {
     index: number
     onEdit: (ticket: TicketRow) => void
     onDelete: (id: string) => void
+    isAdmin: boolean
 }
 
-function SortableTicketRow({ ticket, index, onEdit, onDelete }: SortableTicketRowProps) {
+function SortableTicketRow({ ticket, index, onEdit, onDelete, isAdmin }: SortableTicketRowProps) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: ticket.id,
     })
@@ -75,6 +77,7 @@ function SortableTicketRow({ ticket, index, onEdit, onDelete }: SortableTicketRo
                     type="button"
                     {...attributes}
                     {...listeners}
+                    disabled={!isAdmin}
                     className="cursor-grab touch-none p-1 text-muted-foreground hover:text-foreground active:cursor-grabbing"
                     aria-label="순서 변경"
                 >
@@ -86,13 +89,14 @@ function SortableTicketRow({ ticket, index, onEdit, onDelete }: SortableTicketRo
             <TableCell className="text-right">{Number(ticket.price).toLocaleString()}원</TableCell>
             <TableCell className="text-right">
                 <div className="flex justify-end gap-2">
-                    <Button variant="ghost" size="icon" onClick={() => onEdit(ticket)}>
+                    <Button variant="ghost" size="icon" title={isAdmin ? "수정" : "조회"} onClick={() => onEdit(ticket)}>
                         <Pencil className="h-4 w-4" />
                     </Button>
                     <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => onDelete(ticket.id)}
+                        disabled={!isAdmin}
                         className="text-red-500 hover:text-red-700"
                     >
                         <Trash2 className="h-4 w-4" />
@@ -104,6 +108,7 @@ function SortableTicketRow({ ticket, index, onEdit, onDelete }: SortableTicketRo
 }
 
 export default function TicketsPage() {
+    const { isAdmin } = useUserRole()
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [editingTicket, setEditingTicket] = useState<TicketRow | null>(null)
     const supabase = createClient()
@@ -191,7 +196,7 @@ export default function TicketsPage() {
                 </h1>
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                     <DialogTrigger asChild>
-                        <Button onClick={openCreateDialog}>
+                        <Button onClick={openCreateDialog} disabled={!isAdmin}>
                             <Plus className="mr-2 h-4 w-4" />
                             이용권 추가
                         </Button>
@@ -252,6 +257,7 @@ export default function TicketsPage() {
                                                 index={index}
                                                 onEdit={openEditDialog}
                                                 onDelete={deleteTicket}
+                                                isAdmin={isAdmin}
                                             />
                                         ))}
                                     </SortableContext>

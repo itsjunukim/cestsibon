@@ -24,6 +24,7 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { Plus, Check, Filter, Pencil, Trash2, ArrowUpDown, Download, Columns, Search, Ban } from "lucide-react"
+import { useUserRole } from "@/hooks/useUserRole"
 import * as XLSX from 'xlsx';
 import { ReservationForm } from "@/components/ReservationForm"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -50,13 +51,7 @@ type SortConfig = {
 function ReservationsContent() {
     const searchParams = useSearchParams()
     const router = useRouter()
-
-    // ... I need to be careful not to delete the body.
-    // Replace_file_content typically replaces the chunks.
-    // If I select lines 30-42, I am replacing imports and function declaration.
-    // Then I need to append to the end.
-    // I will do it in two chunks? No, Step 3 requires strictly sequential tools or single tool call.
-    // "multi_replace_file_content" is better here.
+    const { isAdmin } = useUserRole()
 
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [editingReservation, setEditingReservation] = useState<any>(null)
@@ -100,7 +95,7 @@ function ReservationsContent() {
             const client = createClient()
             const { data } = await client
                 .from("reservations")
-                .select("*, accommodations(name), rooms(name), reservation_tickets(ticket_id, quantity, tickets(name))")
+                .select("*, accommodations(name), reservation_rooms(room_id, rooms(name)), reservation_tickets(ticket_id, quantity, tickets(name))")
                 .eq("id", editIdParam)
                 .single()
             if (data) {
@@ -156,7 +151,7 @@ function ReservationsContent() {
         queryFn: async () => {
             let query = supabase
                 .from("reservations")
-                .select("*, accommodations(name), rooms(name), reservation_tickets(ticket_id, quantity, tickets(name))")
+                .select("*, accommodations(name), reservation_rooms(room_id, rooms(name)), reservation_tickets(ticket_id, quantity, tickets(name))")
 
             if (dateRange?.from) {
                 const fromStr = format(dateRange.from, "yyyy-MM-dd")
@@ -452,7 +447,7 @@ function ReservationsContent() {
 
                     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                         <DialogTrigger asChild>
-                            <Button onClick={openCreateDialog} className="w-full md:w-auto">
+                            <Button onClick={openCreateDialog} disabled={!isAdmin} className="w-full md:w-auto">
                                 <Plus className="mr-2 h-4 w-4" />
                                 새 예약
                             </Button>
@@ -557,9 +552,10 @@ function ReservationsContent() {
                                     {visibleColumns.visit && (
                                         <TableCell className="p-0 align-middle">
                                             <div className="flex justify-center items-center w-full h-full min-h-[40px]">
-                                                <Checkbox 
-                                                    checked={res.is_visited || false} 
+                                                <Checkbox
+                                                    checked={res.is_visited || false}
                                                     onCheckedChange={(checked) => updateVisitStatus(res.id, !!checked)}
+                                                    disabled={!isAdmin}
                                                     className="h-5 w-5 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                                                     title={res.is_visited ? "방문 취소" : "방문 확인"}
                                                 />
@@ -574,10 +570,10 @@ function ReservationsContent() {
                                     )}
                                     {visibleColumns.headcount && <TableCell>{res.headcount || 1}명</TableCell>}
                                     {visibleColumns.accommodation && (
-                                        <TableCell className="max-w-[120px] truncate" title={res.accommodations?.name ? `${res.accommodations.name}${res.rooms?.name ? ` (${res.rooms.name})` : ""}` : ""}>
+                                        <TableCell className="max-w-[120px] truncate" title={res.accommodations?.name ? `${res.accommodations.name}${res.reservation_rooms && res.reservation_rooms.length > 0 ? ` (${res.reservation_rooms.map((rr:any)=>rr.rooms?.name).join(', ')})` : ""}` : ""}>
                                             {res.accommodations?.name ? (
                                                 <span className="font-medium text-indigo-600">
-                                                    🏠 {res.accommodations.name}{res.rooms?.name ? ` (${res.rooms.name})` : ""}
+                                                    🏠 {res.accommodations.name}{res.reservation_rooms && res.reservation_rooms.length > 0 ? ` (${res.reservation_rooms.map((rr:any)=>rr.rooms?.name).join(', ')})` : ""}
                                                 </span>
                                             ) : "-"}
                                         </TableCell>
@@ -605,10 +601,13 @@ function ReservationsContent() {
                                             ) : <span className="text-gray-300">-</span>}
                                         </TableCell>
                                     )}
-                                    {visibleColumns.payment && (
+                                    {visibleColumns.payment && (() => {
+                                        const settled = res.status === 'completed' && res.balance_payment_method && res.balance_payment_method !== 'none'
+                                        const methodLabel = res.balance_payment_method === 'transfer' ? '이체' : res.balance_payment_method === 'card' ? '카드' : res.balance_payment_method === 'cash' ? '현금' : res.balance_payment_method === 'place' ? '플레이스' : res.balance_payment_method === 'store' ? '스토어' : res.balance_payment_method === 'social' ? '소셜' : null
+                                        return (
                                         <TableCell className="whitespace-nowrap">
-                                            <div className="flex flex-col space-y-1.5 text-xs bg-slate-50/50 p-2 rounded-md border border-slate-200 min-w-[150px] shadow-sm">
-                                                <div className="flex justify-between items-center border-b border-slate-200 pb-1.5 mb-0.5">
+                                            <div className={`flex flex-col space-y-1.5 text-xs p-2 rounded-md border min-w-[150px] shadow-sm ${settled ? "bg-green-50 border-green-200 border-l-[3px] border-l-green-400" : "bg-slate-50/50 border-slate-200"}`}>
+                                                <div className={`flex justify-between items-center border-b pb-1.5 mb-0.5 ${settled ? "border-green-100" : "border-slate-200"}`}>
                                                     <span className="text-slate-700 font-bold text-[11px]">총 결제 금액</span>
                                                     <span className="font-extrabold text-foreground text-[14px]">{fmtMoney(res.total_amount)}</span>
                                                 </div>
@@ -626,24 +625,28 @@ function ReservationsContent() {
                                                         )}
                                                     </div>
                                                 </div>
-                                                {Number(res.balance) > 0 &&
+                                                {Number(res.balance) > 0 && (
                                                     <div className="flex justify-between items-center text-[11px] mt-0.5">
-                                                        <span className="text-red-600 font-bold">잔금</span>
-                                                        <div className="flex items-center gap-1.5 text-red-700 font-bold">
+                                                        <span className={settled ? "text-slate-600 font-bold" : "text-red-600 font-bold"}>잔금</span>
+                                                        <div className={`flex items-center gap-1.5 font-bold ${settled ? "text-green-700" : "text-red-700"}`}>
                                                             <span>{fmtMoney(res.balance)}</span>
-                                                            {res.balance_payment_method ? (
-                                                                <span className="text-[10px] bg-white px-1 border border-red-200 rounded-sm text-red-700 font-bold shadow-sm">
-                                                                    {res.balance_payment_method === 'transfer' ? '이체' : res.balance_payment_method === 'card' ? '카드' : res.balance_payment_method === 'cash' ? '현금' : res.balance_payment_method === 'place' ? '플레이스' : res.balance_payment_method === 'store' ? '스토어' : res.balance_payment_method === 'social' ? '소셜' : '미정'}
+                                                            {methodLabel ? (
+                                                                <span className={settled
+                                                                    ? "text-[10px] text-green-800 bg-green-100 px-1 rounded-sm font-bold shadow-sm"
+                                                                    : "text-[10px] bg-white px-1 border border-red-200 rounded-sm text-red-700 font-bold shadow-sm"
+                                                                }>
+                                                                    {methodLabel}
                                                                 </span>
                                                             ) : (
                                                                 <span className="text-[10px] bg-red-100 px-1 rounded-sm text-red-600 font-bold shadow-sm">미정</span>
                                                             )}
                                                         </div>
                                                     </div>
-                                                }
+                                                )}
                                             </div>
                                         </TableCell>
-                                    )}
+                                        )
+                                    })()}
                                     {visibleColumns.notes && (
                                         <TableCell className="max-w-[150px] truncate text-xs text-gray-500" title={res.notes}>
                                             {res.notes || "-"}
@@ -652,7 +655,7 @@ function ReservationsContent() {
                                     {visibleColumns.status && (
                                         <TableCell>
                                             <div onClick={(e) => e.stopPropagation()}>
-                                                <Select value={res.status} onValueChange={(val) => handleStatusChange(res, val)}>
+                                                <Select value={res.status} onValueChange={(val) => handleStatusChange(res, val)} disabled={!isAdmin}>
                                                     <SelectTrigger className={`h-7 px-3 py-1 border-0 rounded-full text-xs font-semibold whitespace-nowrap w-fit shadow-sm focus:ring-0 focus:ring-offset-0 ${res.status === 'completed' ? 'bg-green-100 text-green-700 hover:bg-green-200' : res.status === 'cancelled' ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'}`}>
                                                         <SelectValue />
                                                     </SelectTrigger>
@@ -667,11 +670,11 @@ function ReservationsContent() {
                                     )}
                                     <TableCell className="text-right">
                                         <div className="flex justify-end gap-1">
-                                            <Button variant="ghost" size="icon" title="수정" onClick={() => openEditDialog(res)} className="h-8 w-8">
+                                            <Button variant="ghost" size="icon" title={isAdmin ? "수정" : "조회"} onClick={() => openEditDialog(res)} className="h-8 w-8">
                                                 <Pencil className="h-4 w-4" />
                                             </Button>
                                             {res.status === 'cancelled' && (
-                                                <Button variant="ghost" size="icon" title="영구 삭제" onClick={() => deleteReservation(res.id)} className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8">
+                                                <Button variant="ghost" size="icon" title="영구 삭제" onClick={() => deleteReservation(res.id)} disabled={!isAdmin} className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8">
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             )}
@@ -708,7 +711,7 @@ function ReservationsContent() {
                                         </CardDescription>
                                     </div>
                                     <div onClick={(e) => e.stopPropagation()}>
-                                        <Select value={res.status} onValueChange={(val) => handleStatusChange(res, val)}>
+                                        <Select value={res.status} onValueChange={(val) => handleStatusChange(res, val)} disabled={!isAdmin}>
                                             <SelectTrigger className={`h-7 px-3 py-1 border-0 rounded-full text-xs font-semibold whitespace-nowrap w-fit shadow-sm focus:ring-0 focus:ring-offset-0 ${res.status === 'completed' ? 'bg-green-100 text-green-700 hover:bg-green-200' : res.status === 'cancelled' ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'}`}>
                                                 <SelectValue />
                                             </SelectTrigger>
@@ -776,10 +779,10 @@ function ReservationsContent() {
                             </CardContent>
                             <div className="flex items-center justify-end gap-2 p-3 border-t bg-muted/20">
                                 <Button size="sm" variant="ghost" onClick={() => openEditDialog(res)}>
-                                    <Pencil className="h-4 w-4 mr-1" /> 수정
+                                    <Pencil className="h-4 w-4 mr-1" /> {isAdmin ? "수정" : "조회"}
                                 </Button>
                                 {res.status === 'cancelled' && (
-                                    <Button size="sm" variant="ghost" title="영구 삭제" onClick={() => deleteReservation(res.id)} className="text-red-500 hover:text-red-700 hover:bg-red-50">
+                                    <Button size="sm" variant="ghost" title="영구 삭제" onClick={() => deleteReservation(res.id)} disabled={!isAdmin} className="text-red-500 hover:text-red-700 hover:bg-red-50">
                                         <Trash2 className="h-4 w-4" />
                                     </Button>
                                 )}

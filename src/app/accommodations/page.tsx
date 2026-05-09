@@ -1,6 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
+import { useUserRole } from "@/hooks/useUserRole"
 import {
     Card,
     CardContent,
@@ -29,6 +30,7 @@ import { createClient } from "@/lib/supabase"
 import { useState } from "react"
 
 export default function AccommodationsPage() {
+    const { isAdmin } = useUserRole()
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [editingAccommodation, setEditingAccommodation] = useState<any>(null)
     const supabase = createClient()
@@ -63,7 +65,7 @@ export default function AccommodationsPage() {
                     if (!open) setEditingAccommodation(null)
                 }}>
                     <DialogTrigger asChild>
-                        <Button>
+                        <Button disabled={!isAdmin}>
                             <Plus className="mr-2 h-4 w-4" />
                             새 숙소 추가
                         </Button>
@@ -135,7 +137,7 @@ export default function AccommodationsPage() {
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    title="수정"
+                                                    title={isAdmin ? "수정" : "조회"}
                                                     onClick={() => {
                                                         setEditingAccommodation(acc)
                                                         setIsDialogOpen(true)
@@ -147,6 +149,7 @@ export default function AccommodationsPage() {
                                                     variant="ghost"
                                                     size="icon"
                                                     title="삭제"
+                                                    disabled={!isAdmin}
                                                     onClick={async () => {
                                                         if (confirm('정말 삭제하시겠습니까?')) {
                                                             const { error } = await supabase
@@ -200,10 +203,10 @@ export default function AccommodationsPage() {
                                     )}
                                 </div>
                                 <div className="flex gap-1 ml-2">
-                                    <Button variant="ghost" size="icon" onClick={() => { setEditingAccommodation(acc); setIsDialogOpen(true) }}>
+                                    <Button variant="ghost" size="icon" title={isAdmin ? "수정" : "조회"} onClick={() => { setEditingAccommodation(acc); setIsDialogOpen(true) }}>
                                         <Pencil className="h-4 w-4 text-gray-500" />
                                     </Button>
-                                    <Button variant="ghost" size="icon" onClick={async () => {
+                                    <Button variant="ghost" size="icon" disabled={!isAdmin} onClick={async () => {
                                         if (confirm('정말 삭제하시겠습니까?')) {
                                             const { error } = await supabase.from('accommodations').delete().eq('id', acc.id)
                                             if (error) { alert('삭제에 실패했습니다.') } else { queryClient.invalidateQueries({ queryKey: ['accommodations'] }) }
