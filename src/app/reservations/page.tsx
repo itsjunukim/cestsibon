@@ -23,7 +23,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { Plus, Check, Filter, Pencil, Trash2, ArrowUpDown, Download, Columns, Search, Ban } from "lucide-react"
+import { Plus, Check, Filter, Pencil, Trash2, ArrowUpDown, Download, Columns, Search, Ban, Share2 } from "lucide-react"
 import { useUserRole } from "@/hooks/useUserRole"
 import * as XLSX from 'xlsx';
 import { ReservationForm } from "@/components/ReservationForm"
@@ -37,6 +37,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase"
 import { useState, Suspense, useEffect, useRef } from "react"
 import { format, addDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns"
+import { ko } from "date-fns/locale"
 import { useSearchParams, useRouter } from "next/navigation"
 
 import { DateRange } from "react-day-picker"
@@ -296,6 +297,78 @@ function ReservationsContent() {
     // Helper to format currency
     const fmtMoney = (amount: any) => Number(amount || 0).toLocaleString() + "원"
 
+    const handleShareTomorrow = async () => {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const formattedTomorrow = format(tomorrow, "yyyy-MM-dd");
+        
+        try {
+            // 화면의 날짜 필터와 무관하게 DB에서 내일 예약을 직접 조회
+            const { data: tomorrowReservations, error } = await supabase
+                .from("reservations")
+                .select("*, accommodations(name), reservation_rooms(room_id, rooms(name)), reservation_tickets(ticket_id, quantity, tickets(name))")
+                .eq("date", formattedTomorrow)
+                .order('pickup_time', { ascending: true });
+
+            if (error) throw error;
+
+            const list = tomorrowReservations || [];
+            const totalCount = list.length;
+            const totalHeadcount = list.reduce((sum: number, res: any) => sum + (Number(res.headcount) || 0), 0);
+            
+            let shareText = `[📅 ${format(tomorrow, "M월 d일(E)", { locale: ko })} 예약 현황]\n`;
+            shareText += `총 예약: ${totalCount}건 / 방문 예정: ${totalHeadcount}명\n\n`;
+
+            if (totalCount === 0) {
+                shareText += "내일은 예약이 없습니다.\n\n";
+            } else {
+                list.forEach((res: any, idx: number) => {
+                    const name = res.customer_name || "이름없음";
+                    const count = res.headcount ? `${res.headcount}명` : "-";
+                    const typeStr = res.reservation_type === 'accommodation' ? `숙박(${res.accommodations?.name || ""})` : `당일`;
+                    
+                    // Get main ticket name
+                    let ticketName = "";
+                    if (res.reservation_tickets && res.reservation_tickets.length > 0) {
+                        const firstTicket = res.reservation_tickets.find((rt: any) => rt.quantity > 0 && rt.tickets?.name);
+                        if (firstTicket) {
+                            ticketName = firstTicket.tickets.name;
+                        }
+                    }
+                    
+                    const ticketInfo = ticketName ? ` | ${ticketName}` : "";
+                    
+                    let extra = "";
+                    if (res.pickup_location) extra += ` | 픽업: ${res.pickup_location}`;
+                    
+                    shareText += `${idx + 1}. ${name}(${count}) | ${typeStr}${ticketInfo}${extra}\n`;
+                });
+                shareText += `\n`;
+            }
+
+            shareText += `내일도 화이팅합시다! 🚀`;
+
+            if (navigator.share) {
+                await navigator.share({
+                    title: '내일 예약 현황',
+                    text: shareText,
+                });
+            } else {
+                await navigator.clipboard.writeText(shareText);
+                alert("내일 예약 내역이 클립보드에 복사되었습니다.\n원하는 곳에 붙여넣기 해주세요!");
+            }
+        } catch (error) {
+            console.error("공유 실패:", error);
+            if ((error as any).name !== 'AbortError') {
+                try {
+                    // Try fallback copy text if possible
+                    await navigator.clipboard.writeText(`[에러] 데이터를 가져오지 못했습니다.`);
+                } catch(e) {}
+                alert("데이터를 가져오거나 복사하는데 실패했습니다.");
+            }
+        }
+    }
+
     const handleExportExcel = () => {
         if (!filteredReservations || filteredReservations.length === 0) {
             alert("다운로드할 데이터가 없습니다.")
@@ -390,6 +463,10 @@ function ReservationsContent() {
                     <div className="flex items-center space-x-1 border bg-background rounded-md h-9 px-1 shadow-sm">
                         <Button variant="ghost" className="h-7 w-7 p-0 hover:bg-muted" onClick={() => setDateRange(undefined)} title="날짜 필터 초기화(전체 보기)">
                             <Filter className="h-4 w-4 text-foreground" />
+                        </Button>
+
+                        <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-muted text-blue-600" onClick={handleShareTomorrow} title="내일 예약 카톡 공유">
+                            <Share2 className="h-4 w-4" />
                         </Button>
 
                         <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-muted" onClick={handleExportExcel} title="엑셀 저장">
