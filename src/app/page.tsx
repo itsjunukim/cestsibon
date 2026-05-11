@@ -1,31 +1,88 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Users, CreditCard, Calendar as CalendarIcon, TrendingUp, DollarSign, Activity, CalendarDays, Lock } from "lucide-react"
+import { Users, DollarSign, Activity, CalendarDays, Lock, Wallet, ReceiptText, MapPin, Clock, ChevronRight, TrendingUp } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { useQuery } from "@tanstack/react-query"
-import { StatsChart } from "@/components/StatsChart"
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns"
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, startOfDay, endOfDay, isSameDay, addDays, differenceInCalendarDays } from "date-fns"
 import { ko } from "date-fns/locale"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, type ReactNode, type ComponentType } from "react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useRouter, usePathname } from "next/navigation"
 import { PinUnlockDialog } from "@/components/PinUnlockDialog"
+import { DateRange } from "react-day-picker"
+import { DateRangePicker } from "@/components/DateRangePicker"
+import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip as RTooltip, CartesianGrid } from "recharts"
 
-type ViewMode = 'daily' | 'weekly' | 'monthly'
+const WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토']
+const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0]
+
+type AccentTone = "indigo" | "amber" | "emerald" | "violet" | "cyan" | "rose"
+
+const ACCENT_CLASSES: Record<AccentTone, { cardBg: string; border: string; iconBg: string; iconText: string; valueText: string }> = {
+  indigo:  { cardBg: "bg-gradient-to-br from-indigo-50/80 to-white",   border: "border-indigo-100",  iconBg: "bg-indigo-100",  iconText: "text-indigo-600",  valueText: "text-indigo-900"  },
+  amber:   { cardBg: "bg-gradient-to-br from-amber-50/80 to-white",    border: "border-amber-100",   iconBg: "bg-amber-100",   iconText: "text-amber-600",   valueText: "text-amber-900"   },
+  emerald: { cardBg: "bg-gradient-to-br from-emerald-50/80 to-white",  border: "border-emerald-100", iconBg: "bg-emerald-100", iconText: "text-emerald-600", valueText: "text-emerald-900" },
+  violet:  { cardBg: "bg-gradient-to-br from-violet-50/80 to-white",   border: "border-violet-100",  iconBg: "bg-violet-100",  iconText: "text-violet-600",  valueText: "text-violet-900"  },
+  cyan:    { cardBg: "bg-gradient-to-br from-cyan-50/80 to-white",     border: "border-cyan-100",    iconBg: "bg-cyan-100",    iconText: "text-cyan-600",    valueText: "text-cyan-900"    },
+  rose:    { cardBg: "bg-gradient-to-br from-rose-50/80 to-white",     border: "border-rose-100",    iconBg: "bg-rose-100",    iconText: "text-rose-600",    valueText: "text-rose-900"    },
+}
+
+interface KPICardProps {
+  label: string
+  value: ReactNode
+  icon: ComponentType<{ className?: string }>
+  tone: AccentTone
+  hint?: string
+}
+
+function KPICard({ label, value, icon: Icon, tone, hint }: KPICardProps) {
+  const c = ACCENT_CLASSES[tone]
+  return (
+    <Card className={cn("rounded-xl shadow-sm hover:shadow-md transition-shadow border", c.border, c.cardBg)}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+        <CardTitle className="text-base font-semibold text-slate-700">
+          {label}
+        </CardTitle>
+        <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center", c.iconBg)}>
+          <Icon className={cn("h-5 w-5", c.iconText)} />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className={cn("text-3xl font-bold tracking-tight tabular-nums", c.valueText)}>
+          {value}
+        </div>
+        {hint && <p className="text-xs text-slate-500 mt-1.5">{hint}</p>}
+      </CardContent>
+    </Card>
+  )
+}
+
+function formatWonShort(v: number): string {
+  if (v === 0) return "0원"
+  if (Math.abs(v) >= 100000000) {
+    const n = v / 100000000
+    return `${n % 1 === 0 ? n : n.toFixed(1)}억원`
+  }
+  if (Math.abs(v) >= 10000) {
+    return `${Math.round(v / 10000).toLocaleString()}만원`
+  }
+  return `${v.toLocaleString()}원`
+}
 
 export default function DashboardPage() {
-  const [viewMode, setViewMode] = useState<ViewMode>('monthly')
   const [isUnlocked, setIsUnlocked] = useState(false)
   const [isPinDialogOpen, setIsPinDialogOpen] = useState(false)
 
-  // Fixed reference date to today since picker is removed
-  const date = new Date()
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
+    const today = new Date()
+    return { from: startOfMonth(today), to: endOfMonth(today) }
+  })
+
   const supabase = createClient()
   const router = useRouter()
 
-  // 다른 페이지에서 홈으로 돌아올 때 잠금 초기화
   const pathname = usePathname()
   const prevPathRef = useRef(pathname)
   useEffect(() => {
@@ -40,48 +97,22 @@ export default function DashboardPage() {
     setIsPinDialogOpen(false)
   }
 
-  // Calculate range based on mode
-  const getRange = () => {
-    const start = date // default
-    const end = date // default
+  const start = dateRange?.from ? startOfDay(dateRange.from) : startOfDay(new Date())
+  const end = dateRange?.to ? endOfDay(dateRange.to) : endOfDay(start)
+  const isSingleDay = isSameDay(start, end)
+  const label = isSingleDay
+    ? format(start, "yyyy년 M월 d일", { locale: ko })
+    : `${format(start, "yyyy.MM.dd", { locale: ko })} - ${format(end, "yyyy.MM.dd", { locale: ko })}`
 
-    if (viewMode === 'daily') {
-      return {
-        start: date,
-        end: date,
-        label: format(date, "PPP", { locale: ko })
-      }
-    }
-    if (viewMode === 'weekly') {
-      return {
-        start: startOfWeek(date, { weekStartsOn: 1 }),
-        end: endOfWeek(date, { weekStartsOn: 1 }),
-        label: `${format(startOfWeek(date, { weekStartsOn: 1 }), "MMM d일", { locale: ko })} - ${format(endOfWeek(date, { weekStartsOn: 1 }), "MMM d일", { locale: ko })}`
-      }
-    }
-    if (viewMode === 'monthly') {
-      return {
-        start: startOfMonth(date),
-        end: endOfMonth(date),
-        label: format(date, "yyyy년 MMMM", { locale: ko })
-      }
-    }
-    return { start, end, label: '' }
-  }
+  const startStr = format(start, "yyyy-MM-dd")
+  const endStr = format(end, "yyyy-MM-dd")
 
-  const { start, end, label } = getRange()
-
-  const { data: stats, isLoading } = useQuery({
-    queryKey: ["dashboard-stats", viewMode], // Removed 'date' from key as it's constant 'now' basically, or viewMode changes range
+  const { data: stats } = useQuery({
+    queryKey: ["dashboard-stats", startStr, endStr],
     queryFn: async () => {
-      const startStr = format(start, "yyyy-MM-dd")
-      const endStr = format(end, "yyyy-MM-dd")
-
-      // Query Reservations for EVERYTHING (Sales, Count, Chart)
-      // User requested Sales to be based on reservations total_amount
       const { data: reservations, error } = await supabase
         .from("reservations")
-        .select("date, total_amount, status, customer_name, reservation_type, headcount")
+        .select("date, total_amount, deposit, is_deposit_paid, status, customer_name, reservation_type, headcount")
         .gte("date", startStr)
         .lte("date", endStr)
         .neq("status", "cancelled")
@@ -89,57 +120,90 @@ export default function DashboardPage() {
 
       if (error) {
         console.error("Error fetching reservations:", error)
-        return { totalSales: 0, activeReservations: 0, visitorCount: 0, chartData: [] }
+        return {
+          totalSales: 0, activeReservations: 0, visitorCount: 0,
+          avgPerReservation: 0, avgPerVisitor: 0, unpaidDepositTotal: 0,
+          chartData: [], weekdayChart: []
+        }
       }
 
-      // 1. Calculate Total Sales
       const totalSales = reservations?.reduce((acc, curr) => acc + (Number(curr.total_amount) || 0), 0) || 0
-
-      // 2. Reservations Count
       const activeReservations = reservations?.length || 0
-
-      // 3. Visitor Count (Sum of headcount from all reservations)
       const visitorCount = reservations?.reduce((acc, curr) => acc + (Number(curr.headcount) || 0), 0) || 0
+      const avgPerReservation = activeReservations > 0 ? Math.round(totalSales / activeReservations) : 0
+      const avgPerVisitor = visitorCount > 0 ? Math.round(totalSales / visitorCount) : 0
+      const unpaidDepositTotal = reservations
+        ?.filter(r => !r.is_deposit_paid && r.status === 'booked' && Number(r.deposit) > 0)
+        .reduce((acc, curr) => acc + (Number(curr.deposit) || 0), 0) || 0
 
-      // 4. Chart Data
-      let chartData = []
-      if (viewMode === 'daily') {
-        // Single bar for the day
-        chartData = [{
-          name: format(start, "MMM dd일", { locale: ko }),
-          total: totalSales,
-          fullDate: startStr
-        }]
-      } else {
-        const days = eachDayOfInterval({ start, end })
-        chartData = days.map(day => {
-          const dayStr = format(day, "yyyy-MM-dd")
-          const dayTotal = reservations
-            ?.filter(res => res.date === dayStr)
-            .reduce((acc, curr) => acc + (Number(curr.total_amount) || 0), 0) || 0
+      const days = eachDayOfInterval({ start, end })
+      const chartData = days.map(day => {
+        const dayStr = format(day, "yyyy-MM-dd")
+        const dayTotal = reservations
+          ?.filter(res => res.date === dayStr)
+          .reduce((acc, curr) => acc + (Number(curr.total_amount) || 0), 0) || 0
+        return {
+          name: format(day, "d", { locale: ko }),
+          total: dayTotal,
+          fullDate: dayStr,
+        }
+      })
 
-          return {
-            name: format(day, "d일", { locale: ko }),
-            total: dayTotal,
-            fullDate: dayStr
-          }
-        })
-      }
+      const weekdaySales = [0, 0, 0, 0, 0, 0, 0]
+      reservations?.forEach(r => {
+        if (!r.date) return
+        const wd = new Date(r.date).getDay()
+        weekdaySales[wd] += Number(r.total_amount) || 0
+      })
+      const weekdayChart = WEEKDAY_ORDER.map(idx => ({
+        name: WEEKDAY_LABELS[idx],
+        total: weekdaySales[idx],
+      }))
 
       return {
-        totalSales,
-        activeReservations,
-        visitorCount,
-        chartData
+        totalSales, activeReservations, visitorCount,
+        avgPerReservation, avgPerVisitor, unpaidDepositTotal,
+        chartData, weekdayChart,
       }
     }
   })
 
+  const { data: ops } = useQuery({
+    queryKey: ["dashboard-ops"],
+    queryFn: async () => {
+      const today = startOfDay(new Date())
+      const todayStr = format(today, "yyyy-MM-dd")
+      const threeDaysLaterStr = format(addDays(today, 3), "yyyy-MM-dd")
+
+      const [pickupsRes, arrivalsRes] = await Promise.all([
+        supabase
+          .from("reservations")
+          .select("id, customer_name, pickup_time, pickup_location, headcount")
+          .eq("date", todayStr)
+          .not("pickup_location", "is", null)
+          .neq("status", "cancelled")
+          .order("pickup_time", { ascending: true, nullsFirst: false }),
+        supabase
+          .from("reservations")
+          .select("id, customer_name, date, headcount, reservation_type, accommodations(name)")
+          .gte("date", todayStr)
+          .lte("date", threeDaysLaterStr)
+          .neq("status", "cancelled")
+          .order("date", { ascending: true }),
+      ])
+
+      return {
+        pickups: (pickupsRes.data || []).filter(p => p.pickup_location && p.pickup_location.trim().length > 0),
+        arrivals: arrivalsRes.data || [],
+      }
+    },
+    refetchInterval: 10 * 60 * 1000,
+  })
+
   const finalStats = stats || {
-    totalSales: 0,
-    activeReservations: 0,
-    visitorCount: 0,
-    chartData: []
+    totalSales: 0, activeReservations: 0, visitorCount: 0,
+    avgPerReservation: 0, avgPerVisitor: 0, unpaidDepositTotal: 0,
+    chartData: [], weekdayChart: [],
   }
 
   const handleChartClick = (data: any) => {
@@ -148,162 +212,285 @@ export default function DashboardPage() {
     }
   }
 
+  const handleReservationClick = (id: string) => {
+    router.push(`/reservations?edit=${id}`)
+  }
+
+  const getDayLabel = (dateStr: string) => {
+    const diff = differenceInCalendarDays(new Date(dateStr), startOfDay(new Date()))
+    if (diff === 0) return { label: "오늘", color: "text-red-600 bg-red-50 border-red-200" }
+    if (diff === 1) return { label: "내일", color: "text-orange-600 bg-orange-50 border-orange-200" }
+    if (diff === 2) return { label: "모레", color: "text-amber-600 bg-amber-50 border-amber-200" }
+    return { label: `D-${diff}`, color: "text-slate-600 bg-slate-50 border-slate-200" }
+  }
+
+  const formatWon = (v: number) => `${v.toLocaleString()}원`
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 animate-fade-up">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-primary">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900">
             영업 현황 대시보드
           </h1>
-          <p className="text-sm text-muted-foreground">{label} 현황</p>
+          {isUnlocked && (
+            <p className="text-sm text-slate-500 mt-1">{label}</p>
+          )}
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="flex items-center space-x-1 border bg-slate-100/80 rounded-md p-1 shadow-sm h-10 w-full md:w-auto">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setViewMode('daily')}
-              className={`flex-1 md:w-16 rounded-md transition-all duration-300 h-8 text-xs font-semibold ${viewMode === 'daily' ? 'bg-white shadow-sm text-slate-900 border border-slate-200/60 hover:bg-white/90' : 'text-slate-500 hover:text-slate-700 hover:bg-white/50 border border-transparent'}`}
-            >
-              오늘
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setViewMode('weekly')}
-              className={`flex-1 md:w-16 rounded-md transition-all duration-300 h-8 text-xs font-semibold ${viewMode === 'weekly' ? 'bg-white shadow-sm text-slate-900 border border-slate-200/60 hover:bg-white/90' : 'text-slate-500 hover:text-slate-700 hover:bg-white/50 border border-transparent'}`}
-            >
-              이번 주
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setViewMode('monthly')}
-              className={`flex-1 md:w-16 rounded-md transition-all duration-300 h-8 text-xs font-semibold ${viewMode === 'monthly' ? 'bg-white shadow-sm text-slate-900 border border-slate-200/60 hover:bg-white/90' : 'text-slate-500 hover:text-slate-700 hover:bg-white/50 border border-transparent'}`}
-            >
-              이번 달
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-3 animate-fade-up delay-100">
-        <Card className="relative overflow-hidden border-none bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg hover-lift">
-          <div className="absolute right-0 top-0 h-24 w-24 -translate-y-8 translate-x-8 opacity-10">
-            <DollarSign className="h-full w-full" />
-          </div>
-          <div className={cn("transition-all duration-300 h-full", !isUnlocked && "blur-md select-none opacity-50")}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-indigo-100">총 매출</CardTitle>
-              <DollarSign className="h-4 w-4 text-indigo-100" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">₩{isUnlocked ? finalStats.totalSales.toLocaleString() : "***,***"}</div>
-              <p className="text-xs text-indigo-200 mt-1 flex items-center">
-                <TrendingUp className="mr-1 h-3 w-3" />
-                {label} 매출
-              </p>
-            </CardContent>
-          </div>
-          {!isUnlocked && (
-            <div 
-              className="absolute inset-0 z-10 flex flex-col items-center justify-center cursor-pointer hover:bg-black/10 transition-colors rounded-xl"
-              onClick={() => setIsPinDialogOpen(true)}
-            >
-              <Lock className="w-6 h-6 text-white drop-shadow-md mb-1" />
-              <span className="text-xs font-medium text-white drop-shadow-md">잠금 해제</span>
+        {isUnlocked && (
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center space-x-1 border border-slate-200 bg-white rounded-lg p-1 shadow-sm h-10">
+              <Button variant="ghost" size="sm" onClick={() => {
+                const today = new Date()
+                setDateRange({ from: startOfDay(today), to: endOfDay(today) })
+              }} className="md:w-16 rounded-md h-8 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100">오늘</Button>
+              <Button variant="ghost" size="sm" onClick={() => {
+                const today = new Date()
+                setDateRange({ from: startOfWeek(today, { weekStartsOn: 1 }), to: endOfWeek(today, { weekStartsOn: 1 }) })
+              }} className="md:w-16 rounded-md h-8 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100">이번 주</Button>
+              <Button variant="ghost" size="sm" onClick={() => {
+                const today = new Date()
+                setDateRange({ from: startOfMonth(today), to: endOfMonth(today) })
+              }} className="md:w-16 rounded-md h-8 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100">이번 달</Button>
             </div>
-          )}
-        </Card>
-
-        <Card className="relative overflow-hidden border-none bg-gradient-to-br from-orange-400 to-pink-500 text-white shadow-lg hover-lift">
-          <div className="absolute right-0 top-0 h-24 w-24 -translate-y-8 translate-x-8 opacity-10">
-            <Users className="h-full w-full" />
-          </div>
-          <div className={cn("transition-all duration-300 h-full", !isUnlocked && "blur-md select-none opacity-50")}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-orange-100">예약</CardTitle>
-              <CalendarDays className="h-4 w-4 text-orange-100" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{isUnlocked ? finalStats.activeReservations : "***"}건</div>
-              <p className="text-xs text-orange-200 mt-1 flex items-center">
-                <Users className="mr-1 h-3 w-3" />
-                {label} 예약
-              </p>
-            </CardContent>
-          </div>
-          {!isUnlocked && (
-            <div 
-              className="absolute inset-0 z-10 flex flex-col items-center justify-center cursor-pointer hover:bg-black/10 transition-colors rounded-xl"
-              onClick={() => setIsPinDialogOpen(true)}
-            >
-              <Lock className="w-6 h-6 text-white drop-shadow-md mb-1" />
-              <span className="text-xs font-medium text-white drop-shadow-md">잠금 해제</span>
-            </div>
-          )}
-        </Card>
-
-        <Card className="relative overflow-hidden border-none bg-gradient-to-br from-emerald-400 to-teal-500 text-white shadow-lg hover-lift">
-          <div className="absolute right-0 top-0 h-24 w-24 -translate-y-8 translate-x-8 opacity-10">
-            <Activity className="h-full w-full" />
-          </div>
-          <div className={cn("transition-all duration-300 h-full", !isUnlocked && "blur-md select-none opacity-50")}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-emerald-100">총 방문객</CardTitle>
-              <Users className="h-4 w-4 text-emerald-100" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{isUnlocked ? finalStats.visitorCount : "***"}명</div>
-              <p className="text-xs text-emerald-200 mt-1 flex items-center">
-                <Users className="mr-1 h-3 w-3" />
-                {label} 방문 수
-              </p>
-            </CardContent>
-          </div>
-          {!isUnlocked && (
-            <div 
-              className="absolute inset-0 z-10 flex flex-col items-center justify-center cursor-pointer hover:bg-black/10 transition-colors rounded-xl"
-              onClick={() => setIsPinDialogOpen(true)}
-            >
-              <Lock className="w-6 h-6 text-white drop-shadow-md mb-1" />
-              <span className="text-xs font-medium text-white drop-shadow-md">잠금 해제</span>
-            </div>
-          )}
-        </Card>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-1 animate-fade-up delay-200">
-        {isUnlocked ? (
-          <Card className="col-span-4 border-none shadow-md hover-lift transition-all duration-300">
-            <CardHeader>
-              <CardTitle>매출 추이</CardTitle>
-            </CardHeader>
-            <CardContent className="pl-2">
-              <StatsChart
-                data={finalStats.chartData}
-                onBarClick={handleChartClick}
-              />
-            </CardContent>
-          </Card>
-        ) : (
-          <div
-            className="flex items-center justify-center h-80 bg-slate-100 rounded-xl cursor-pointer border border-slate-200"
-            onClick={() => setIsPinDialogOpen(true)}
-          >
-            <div className="bg-white px-5 py-3 rounded-full border shadow-md flex items-center gap-2">
-              <Lock className="w-5 h-5 text-slate-700" />
-              <span className="text-sm font-bold text-slate-700">잠금 해제</span>
-            </div>
+            <DateRangePicker date={dateRange} onDateChange={setDateRange} />
           </div>
         )}
       </div>
 
-      <PinUnlockDialog 
-        isOpen={isPinDialogOpen} 
-        onClose={() => setIsPinDialogOpen(false)} 
-        onUnlock={handleUnlockSuccess} 
+      <div className="relative">
+        <div className={cn("space-y-6 transition-all duration-300", !isUnlocked && "blur-md select-none pointer-events-none")}>
+          {/* KPI Grid */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <KPICard
+              label="총 매출"
+              value={formatWon(finalStats.totalSales)}
+              icon={DollarSign}
+              tone="indigo"
+              hint="기간 내 총 매출"
+            />
+            <KPICard
+              label="예약"
+              value={`${finalStats.activeReservations.toLocaleString()}건`}
+              icon={CalendarDays}
+              tone="amber"
+              hint="유효 예약 건수"
+            />
+            <KPICard
+              label="총 방문객"
+              value={`${finalStats.visitorCount.toLocaleString()}명`}
+              icon={Users}
+              tone="emerald"
+              hint="기간 내 방문자 합계"
+            />
+            <KPICard
+              label="평균 예약 단가"
+              value={formatWon(finalStats.avgPerReservation)}
+              icon={ReceiptText}
+              tone="violet"
+              hint="예약 1건당 평균 매출"
+            />
+            <KPICard
+              label="객단가"
+              value={formatWon(finalStats.avgPerVisitor)}
+              icon={Activity}
+              tone="cyan"
+              hint="방문객 1인당 평균 매출"
+            />
+            <KPICard
+              label="예약금 미입금"
+              value={formatWon(finalStats.unpaidDepositTotal)}
+              icon={Wallet}
+              tone="rose"
+              hint="미입금 예약금 합계"
+            />
+          </div>
+
+          {/* Charts */}
+          <div className="grid gap-4 lg:grid-cols-3">
+            <Card className="lg:col-span-2 border border-slate-200/80 bg-white rounded-xl shadow-sm">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div>
+                  <CardTitle className="text-sm font-semibold text-slate-900">매출 추이</CardTitle>
+                  <p className="text-xs text-slate-500 mt-0.5">일별 매출 합계</p>
+                </div>
+                <TrendingUp className="h-4 w-4 text-slate-400" />
+              </CardHeader>
+              <CardContent className="pl-2">
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={finalStats.chartData} onClick={(e: any) => e?.activePayload?.[0]?.payload && handleChartClick(e.activePayload[0].payload)}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                    <XAxis
+                      dataKey="name"
+                      stroke="#94a3b8"
+                      fontSize={10}
+                      tickLine={false}
+                      axisLine={false}
+                      interval={0}
+                    />
+                    <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} width={64} tickFormatter={(v) => formatWonShort(v as number)} />
+                    <RTooltip
+                      cursor={{ fill: '#f8fafc' }}
+                      contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(15, 23, 42, 0.08)', fontSize: '12px' }}
+                      formatter={(v) => [formatWon(Number(v)), '매출']}
+                      labelFormatter={(label) => `${label}일`}
+                    />
+                    <Bar dataKey="total" fill="#6366f1" radius={[6, 6, 0, 0]} maxBarSize={36} className="cursor-pointer" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card className="border border-slate-200/80 bg-white rounded-xl shadow-sm">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div>
+                  <CardTitle className="text-sm font-semibold text-slate-900">요일별 매출</CardTitle>
+                  <p className="text-xs text-slate-500 mt-0.5">요일별 합계</p>
+                </div>
+                <CalendarDays className="h-4 w-4 text-slate-400" />
+              </CardHeader>
+              <CardContent className="pl-2">
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={finalStats.weekdayChart}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                    <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} width={56} tickFormatter={(v) => formatWonShort(v as number)} />
+                    <RTooltip
+                      cursor={{ fill: '#f8fafc' }}
+                      contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(15, 23, 42, 0.08)', fontSize: '12px' }}
+                      formatter={(v) => [formatWon(Number(v)), '매출']}
+                    />
+                    <Bar dataKey="total" fill="#10b981" radius={[6, 6, 0, 0]} maxBarSize={32} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Operational Lists */}
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card className="border border-slate-200/80 bg-white rounded-xl shadow-sm">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-lg bg-orange-50 flex items-center justify-center">
+                    <MapPin className="h-4 w-4 text-orange-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-sm font-semibold text-slate-900">오늘 픽업 일정</CardTitle>
+                    <p className="text-xs text-slate-500 mt-0.5">{ops?.pickups.length || 0}건</p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {!ops?.pickups || ops.pickups.length === 0 ? (
+                  <p className="text-sm text-slate-400 text-center py-8">예정된 픽업이 없습니다</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {ops.pickups.map((p: any) => (
+                      <button
+                        key={p.id}
+                        onClick={() => handleReservationClick(p.id)}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 transition-colors text-left group"
+                      >
+                        <div className="flex flex-col items-center justify-center w-12 h-12 rounded-lg bg-orange-50 border border-orange-100 shrink-0">
+                          <Clock className="h-3 w-3 text-orange-500 mb-0.5" />
+                          <div className="text-[11px] font-bold text-orange-700">
+                            {p.pickup_time || '-'}
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-sm text-slate-900 truncate">
+                            {p.customer_name}
+                            {p.headcount && <span className="ml-2 text-xs font-normal text-slate-400">{p.headcount}명</span>}
+                          </div>
+                          <div className="text-xs text-slate-500 truncate flex items-center gap-1 mt-0.5">
+                            <MapPin className="h-3 w-3 shrink-0" />
+                            {p.pickup_location}
+                          </div>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-slate-500 shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border border-slate-200/80 bg-white rounded-xl shadow-sm">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+                    <CalendarDays className="h-4 w-4 text-indigo-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-sm font-semibold text-slate-900">D-3 이내 도착 예정</CardTitle>
+                    <p className="text-xs text-slate-500 mt-0.5">{ops?.arrivals.length || 0}건</p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {!ops?.arrivals || ops.arrivals.length === 0 ? (
+                  <p className="text-sm text-slate-400 text-center py-8">예정된 예약이 없습니다</p>
+                ) : (
+                  <div className="space-y-1.5 max-h-[340px] overflow-y-auto">
+                    {ops.arrivals.map((a: any) => {
+                      const day = getDayLabel(a.date)
+                      return (
+                        <button
+                          key={a.id}
+                          onClick={() => handleReservationClick(a.id)}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 transition-colors text-left group"
+                        >
+                          <span className={cn(
+                            "inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-bold shrink-0 w-12 justify-center",
+                            day.color
+                          )}>
+                            {day.label}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-sm text-slate-900 truncate">
+                              {a.customer_name}
+                              {a.headcount && <span className="ml-2 text-xs font-normal text-slate-400">{a.headcount}명</span>}
+                            </div>
+                            <div className="text-xs text-slate-500 truncate flex items-center gap-2 mt-0.5">
+                              <span>{a.reservation_type === 'accommodation' ? '🌙 숙박' : '☀️ 당일'}</span>
+                              {a.accommodations?.name && <span className="text-slate-300">·</span>}
+                              {a.accommodations?.name && <span>{a.accommodations.name}</span>}
+                            </div>
+                          </div>
+                          <span className="text-xs text-slate-400 shrink-0 tabular-nums">
+                            {format(new Date(a.date), "MM.dd")}
+                          </span>
+                          <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-slate-500 shrink-0" />
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {!isUnlocked && (
+          <button
+            type="button"
+            onClick={() => setIsPinDialogOpen(true)}
+            className="absolute inset-0 z-10 flex items-center justify-center cursor-pointer transition-colors rounded-xl"
+          >
+            <div className="bg-white px-6 py-3 rounded-full border border-slate-200 shadow-md hover:shadow-lg transition-shadow flex items-center gap-2">
+              <Lock className="w-4 h-4 text-slate-600" />
+              <span className="text-sm font-semibold text-slate-700">잠금 해제</span>
+            </div>
+          </button>
+        )}
+      </div>
+
+      <PinUnlockDialog
+        isOpen={isPinDialogOpen}
+        onClose={() => setIsPinDialogOpen(false)}
+        onUnlock={handleUnlockSuccess}
       />
     </div>
   )
