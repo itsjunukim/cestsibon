@@ -623,7 +623,7 @@ function ReservationsContent() {
                                     )}
                                     {visibleColumns.date && (
                                         <TableCell className="whitespace-nowrap font-medium text-gray-700">
-                                            {format(new Date(res.date), "MM-dd")}
+                                            {format(new Date(res.date), "MM-dd(E)", { locale: ko })}
                                         </TableCell>
                                     )}
                                     {visibleColumns.visit && (
@@ -784,7 +784,7 @@ function ReservationsContent() {
                                             <span className="text-sm font-normal text-muted-foreground">({res.headcount}명)</span>
                                         </CardTitle>
                                         <CardDescription className="mt-1 text-foreground font-medium">
-                                            {format(new Date(res.date), "yyyy-MM-dd")} • {formatPhone(res.phone || "") || "연락처 없음"}
+                                            {format(new Date(res.date), "yyyy-MM-dd(E)", { locale: ko })} • {formatPhone(res.phone || "") || "연락처 없음"}
                                         </CardDescription>
                                     </div>
                                     <div onClick={(e) => e.stopPropagation()}>
