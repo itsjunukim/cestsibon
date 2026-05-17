@@ -86,6 +86,20 @@ function ReservationsContent() {
         }
     })
 
+    const [paymentFilter, setPaymentFilter] = useState<string | null>(searchParams.get('payment'))
+
+    useEffect(() => {
+        const startParam = searchParams.get('start')
+        const endParam = searchParams.get('end')
+        if (startParam && endParam) {
+            setDateRange({ from: new Date(startParam), to: new Date(endParam) })
+        }
+        const paymentParam = searchParams.get('payment')
+        if (paymentParam !== null) {
+            setPaymentFilter(paymentParam)
+        }
+    }, [searchParams])
+
     const [searchKeyword, setSearchKeyword] = useState<string>("")
 
     // ?edit=id 파라미터 처리: 알림 등에서 진입 시 해당 예약을 자동으로 수정 다이얼로그로 오픈
@@ -285,13 +299,31 @@ function ReservationsContent() {
 
     // Client-side filtering
     const filteredReservations = reservations?.filter((res: any) => {
-        if (!searchKeyword) return true;
-        const kw = searchKeyword.toLowerCase();
-        return (
-            res.customer_name?.toLowerCase().includes(kw) ||
-            res.phone?.includes(kw) ||
-            res.notes?.toLowerCase().includes(kw)
-        );
+        if (searchKeyword) {
+            const kw = searchKeyword.toLowerCase();
+            if (!(
+                res.customer_name?.toLowerCase().includes(kw) ||
+                res.phone?.includes(kw) ||
+                res.notes?.toLowerCase().includes(kw)
+            )) {
+                return false;
+            }
+        }
+        
+        if (paymentFilter) {
+            const total = Number(res.total_amount) || 0
+            const deposit = Number(res.deposit) || 0
+            const balance = total - deposit
+            const method = res.balance_payment_method
+            
+            if (paymentFilter === 'transfer') {
+                if (!(deposit > 0 || (balance > 0 && method === 'transfer'))) return false;
+            } else {
+                if (!(balance > 0 && method === paymentFilter)) return false;
+            }
+        }
+        
+        return true;
     });
 
     // Helper to format currency
@@ -438,6 +470,27 @@ function ReservationsContent() {
                 </h1>
 
                 <div className="flex flex-wrap items-center gap-3 mt-4 md:mt-0 w-full md:w-auto">
+                    {paymentFilter && (
+                        <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 px-3 py-1.5 rounded-full text-sm font-medium">
+                            결제 필터: {
+                                paymentFilter === 'transfer' ? '계좌이체 (예약금 포함)' :
+                                paymentFilter === 'cash' ? '현금' :
+                                paymentFilter === 'card' ? '카드' :
+                                paymentFilter === 'place' ? '플레이스' :
+                                paymentFilter === 'store' ? '스토어' :
+                                paymentFilter === 'social' ? '소셜' : paymentFilter
+                            }
+                            <button onClick={() => {
+                                setPaymentFilter(null)
+                                // Remove payment param from URL
+                                const url = new URL(window.location.href)
+                                url.searchParams.delete('payment')
+                                router.replace(url.pathname + url.search)
+                            }} className="ml-1 hover:text-blue-900 rounded-full p-0.5 hover:bg-blue-200/50">
+                                <Ban className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+                    )}
                     <div className="relative w-full md:w-56 lg:w-64">
                         <Search className="absolute left-2.5 top-[8.5px] h-4 w-4 text-muted-foreground" />
                         <Input

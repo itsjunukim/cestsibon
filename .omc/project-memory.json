@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1778252287328,
+  "lastScanned": 1778597943749,
   "projectRoot": "/Users/junukim/repo/cestsibon",
   "techStack": {
     "languages": [
@@ -78,7 +78,7 @@
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 8,
-      "lastAccessed": 1778252287317,
+      "lastAccessed": 1778597943732,
       "keyFiles": [
         "ADMIN_GUIDE.md",
         "ADMIN_TASK_PLAN.md",
@@ -91,7 +91,7 @@
       "path": "public",
       "purpose": "Public files",
       "fileCount": 6,
-      "lastAccessed": 1778252287317,
+      "lastAccessed": 1778597943732,
       "keyFiles": [
         "file.svg",
         "globe.svg",
@@ -104,7 +104,7 @@
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1778252287319,
+      "lastAccessed": 1778597943736,
       "keyFiles": [
         "middleware.ts"
       ]
@@ -113,7 +113,7 @@
       "path": "supabase",
       "purpose": null,
       "fileCount": 2,
-      "lastAccessed": 1778252287320,
+      "lastAccessed": 1778597943736,
       "keyFiles": [
         "config.toml"
       ]
@@ -122,7 +122,7 @@
       "path": "src/app",
       "purpose": "Application code",
       "fileCount": 5,
-      "lastAccessed": 1778252287320,
+      "lastAccessed": 1778597943737,
       "keyFiles": [
         "favicon.ico",
         "globals.css",
@@ -132,8 +132,8 @@
     "src/components": {
       "path": "src/components",
       "purpose": "UI components",
-      "fileCount": 14,
-      "lastAccessed": 1778252287320,
+      "fileCount": 15,
+      "lastAccessed": 1778597943737,
       "keyFiles": [
         "AccommodationForm.tsx",
         "DateRangePicker.tsx",
@@ -144,7 +144,7 @@
       "path": "src/lib",
       "purpose": "Library code",
       "fileCount": 2,
-      "lastAccessed": 1778252287320,
+      "lastAccessed": 1778597943737,
       "keyFiles": [
         "supabase.ts",
         "utils.ts"
@@ -162,6 +162,12 @@
       "path": "src/app/reservations/page.tsx",
       "accessCount": 67,
       "lastAccessed": 1778297247012,
+      "type": "file"
+    },
+    {
+      "path": "src/app/page.tsx",
+      "accessCount": 37,
+      "lastAccessed": 1778511167581,
       "type": "file"
     },
     {
@@ -213,9 +219,9 @@
       "type": "file"
     },
     {
-      "path": "src/app/page.tsx",
-      "accessCount": 9,
-      "lastAccessed": 1776174695221,
+      "path": "src/components/NoticePopup.tsx",
+      "accessCount": 8,
+      "lastAccessed": 1778511610680,
       "type": "file"
     },
     {
@@ -264,12 +270,6 @@
       "path": "src/components/Sidebar.tsx",
       "accessCount": 4,
       "lastAccessed": 1778254536727,
-      "type": "file"
-    },
-    {
-      "path": "src/components/NoticePopup.tsx",
-      "accessCount": 4,
-      "lastAccessed": 1778290245921,
       "type": "file"
     },
     {
@@ -426,6 +426,18 @@
       "path": "secure_rls_policies.sql",
       "accessCount": 1,
       "lastAccessed": 1778295182805,
+      "type": "file"
+    },
+    {
+      "path": "src/components/DateRangePicker.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1778509159753,
+      "type": "file"
+    },
+    {
+      "path": "src/components/StatsChart.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1778509923848,
       "type": "file"
     }
   ],

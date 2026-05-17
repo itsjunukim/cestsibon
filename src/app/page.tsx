@@ -1,7 +1,7 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Users, DollarSign, Activity, CalendarDays, Lock, Wallet, ReceiptText, MapPin, Clock, ChevronRight, TrendingUp } from "lucide-react"
+import { Users, DollarSign, Activity, CalendarDays, Lock, Wallet, ReceiptText, MapPin, Clock, ChevronRight, TrendingUp, CreditCard, Store, Share2 } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { useQuery } from "@tanstack/react-query"
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, startOfDay, endOfDay, isSameDay, addDays, differenceInCalendarDays } from "date-fns"
@@ -35,12 +35,20 @@ interface KPICardProps {
   icon: ComponentType<{ className?: string }>
   tone: AccentTone
   hint?: string
+  onClick?: () => void
 }
 
-function KPICard({ label, value, icon: Icon, tone, hint }: KPICardProps) {
+function KPICard({ label, value, icon: Icon, tone, hint, onClick }: KPICardProps) {
   const c = ACCENT_CLASSES[tone]
   return (
-    <Card className={cn("rounded-xl shadow-sm hover:shadow-md transition-shadow border", c.border, c.cardBg)}>
+    <Card 
+      onClick={onClick}
+      className={cn(
+        "rounded-xl shadow-sm transition-all border", 
+        c.border, c.cardBg,
+        onClick ? "cursor-pointer hover:shadow-md hover:scale-[1.02]" : "hover:shadow-md"
+      )}
+    >
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
         <CardTitle className="text-base font-semibold text-slate-700">
           {label}
@@ -112,7 +120,7 @@ export default function DashboardPage() {
     queryFn: async () => {
       const { data: reservations, error } = await supabase
         .from("reservations")
-        .select("date, total_amount, deposit, is_deposit_paid, status, customer_name, reservation_type, headcount")
+        .select("date, total_amount, deposit, is_deposit_paid, status, customer_name, reservation_type, headcount, balance_payment_method")
         .gte("date", startStr)
         .lte("date", endStr)
         .neq("status", "cancelled")
@@ -123,38 +131,70 @@ export default function DashboardPage() {
         return {
           totalSales: 0, activeReservations: 0, visitorCount: 0,
           avgPerReservation: 0, avgPerVisitor: 0, unpaidDepositTotal: 0,
-          chartData: [], weekdayChart: []
+          chartData: [], weekdayChart: [],
+          salesBreakdown: { transfer: 0, cash: 0, card: 0, place: 0, social: 0, store: 0 }
         }
       }
 
-      const totalSales = reservations?.reduce((acc, curr) => acc + (Number(curr.total_amount) || 0), 0) || 0
+      let totalSales = 0
+      let unpaidDepositTotal = 0
+      const salesBreakdown = { transfer: 0, cash: 0, card: 0, place: 0, social: 0, store: 0 }
+      const chartMap: Record<string, number> = {}
+      const weekdaySales = [0, 0, 0, 0, 0, 0, 0]
+
+      reservations?.forEach(res => {
+        let total = Number(res.total_amount) || 0
+        const deposit = Number(res.deposit) || 0
+        const balance = total - deposit
+        const method = res.balance_payment_method
+
+        let isUnpaidDeposit = false
+        if (!res.is_deposit_paid && res.status === 'booked' && deposit > 0) {
+            isUnpaidDeposit = true
+            unpaidDepositTotal += deposit
+            total -= deposit // 미입금 예약금은 매출(total)에서 제외
+        }
+
+        totalSales += total
+
+        // 예약금이 입금 완료된 경우만 계좌이체 매출로 집계
+        if (deposit > 0 && !isUnpaidDeposit) {
+            salesBreakdown.transfer += deposit
+        }
+
+        if (balance > 0) {
+            if (method === 'transfer') salesBreakdown.transfer += balance
+            else if (method === 'cash') salesBreakdown.cash += balance
+            else if (method === 'card') salesBreakdown.card += balance
+            else if (method === 'place') salesBreakdown.place += balance
+            else if (method === 'social') salesBreakdown.social += balance
+            else if (method === 'store') salesBreakdown.store += balance
+        }
+
+        if (res.date) {
+            if (!chartMap[res.date]) chartMap[res.date] = 0
+            chartMap[res.date] += total
+            
+            const wd = new Date(res.date).getDay()
+            weekdaySales[wd] += total
+        }
+      })
+
       const activeReservations = reservations?.length || 0
       const visitorCount = reservations?.reduce((acc, curr) => acc + (Number(curr.headcount) || 0), 0) || 0
       const avgPerReservation = activeReservations > 0 ? Math.round(totalSales / activeReservations) : 0
       const avgPerVisitor = visitorCount > 0 ? Math.round(totalSales / visitorCount) : 0
-      const unpaidDepositTotal = reservations
-        ?.filter(r => !r.is_deposit_paid && r.status === 'booked' && Number(r.deposit) > 0)
-        .reduce((acc, curr) => acc + (Number(curr.deposit) || 0), 0) || 0
 
       const days = eachDayOfInterval({ start, end })
       const chartData = days.map(day => {
         const dayStr = format(day, "yyyy-MM-dd")
-        const dayTotal = reservations
-          ?.filter(res => res.date === dayStr)
-          .reduce((acc, curr) => acc + (Number(curr.total_amount) || 0), 0) || 0
         return {
           name: format(day, "d", { locale: ko }),
-          total: dayTotal,
+          total: chartMap[dayStr] || 0,
           fullDate: dayStr,
         }
       })
 
-      const weekdaySales = [0, 0, 0, 0, 0, 0, 0]
-      reservations?.forEach(r => {
-        if (!r.date) return
-        const wd = new Date(r.date).getDay()
-        weekdaySales[wd] += Number(r.total_amount) || 0
-      })
       const weekdayChart = WEEKDAY_ORDER.map(idx => ({
         name: WEEKDAY_LABELS[idx],
         total: weekdaySales[idx],
@@ -163,7 +203,7 @@ export default function DashboardPage() {
       return {
         totalSales, activeReservations, visitorCount,
         avgPerReservation, avgPerVisitor, unpaidDepositTotal,
-        chartData, weekdayChart,
+        chartData, weekdayChart, salesBreakdown,
       }
     }
   })
@@ -204,6 +244,7 @@ export default function DashboardPage() {
     totalSales: 0, activeReservations: 0, visitorCount: 0,
     avgPerReservation: 0, avgPerVisitor: 0, unpaidDepositTotal: 0,
     chartData: [], weekdayChart: [],
+    salesBreakdown: { transfer: 0, cash: 0, card: 0, place: 0, social: 0, store: 0 }
   }
 
   const handleChartClick = (data: any) => {
@@ -214,6 +255,14 @@ export default function DashboardPage() {
 
   const handleReservationClick = (id: string) => {
     router.push(`/reservations?edit=${id}`)
+  }
+
+  const handleNavigateWithFilter = (paymentMethod?: string) => {
+    let url = `/reservations?start=${startStr}&end=${endStr}`
+    if (paymentMethod) {
+      url += `&payment=${paymentMethod}`
+    }
+    router.push(url)
   }
 
   const getDayLabel = (dateStr: string) => {
@@ -261,7 +310,7 @@ export default function DashboardPage() {
 
       <div className="relative">
         <div className={cn("space-y-6 transition-all duration-300", !isUnlocked && "blur-md select-none pointer-events-none")}>
-          {/* KPI Grid */}
+          {/* KPI Grid (Top) */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <KPICard
               label="총 매출"
@@ -269,6 +318,7 @@ export default function DashboardPage() {
               icon={DollarSign}
               tone="indigo"
               hint="기간 내 총 매출"
+              onClick={() => handleNavigateWithFilter()}
             />
             <KPICard
               label="예약"
@@ -276,6 +326,7 @@ export default function DashboardPage() {
               icon={CalendarDays}
               tone="amber"
               hint="유효 예약 건수"
+              onClick={() => handleNavigateWithFilter()}
             />
             <KPICard
               label="총 방문객"
@@ -283,7 +334,58 @@ export default function DashboardPage() {
               icon={Users}
               tone="emerald"
               hint="기간 내 방문자 합계"
+              onClick={() => handleNavigateWithFilter()}
             />
+          </div>
+
+          {/* Sales Breakdown Grid */}
+          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            <KPICard
+              label="계좌이체"
+              value={formatWon(finalStats.salesBreakdown.transfer)}
+              icon={Wallet}
+              tone="indigo"
+              onClick={() => handleNavigateWithFilter('transfer')}
+            />
+            <KPICard
+              label="현금"
+              value={formatWon(finalStats.salesBreakdown.cash)}
+              icon={DollarSign}
+              tone="emerald"
+              onClick={() => handleNavigateWithFilter('cash')}
+            />
+            <KPICard
+              label="카드"
+              value={formatWon(finalStats.salesBreakdown.card)}
+              icon={CreditCard}
+              tone="amber"
+              onClick={() => handleNavigateWithFilter('card')}
+            />
+            <KPICard
+              label="플레이스"
+              value={formatWon(finalStats.salesBreakdown.place)}
+              icon={MapPin}
+              tone="cyan"
+              onClick={() => handleNavigateWithFilter('place')}
+            />
+            <KPICard
+              label="스토어"
+              value={formatWon(finalStats.salesBreakdown.store)}
+              icon={Store}
+              tone="rose"
+              onClick={() => handleNavigateWithFilter('store')}
+            />
+            <KPICard
+              label="소셜"
+              value={formatWon(finalStats.salesBreakdown.social)}
+              icon={Share2}
+              tone="violet"
+              onClick={() => handleNavigateWithFilter('social')}
+            />
+          </div>
+
+          {/* KPI Grid (Bottom) */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <KPICard
               label="평균 예약 단가"
               value={formatWon(finalStats.avgPerReservation)}
