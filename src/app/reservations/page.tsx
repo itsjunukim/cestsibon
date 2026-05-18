@@ -737,8 +737,13 @@ function ReservationsContent() {
                                         </TableCell>
                                     )}
                                     {visibleColumns.payment && (() => {
-                                        const settled = !!res.balance_payment_method && res.balance_payment_method !== 'none'
-                                        const methodLabel = res.balance_payment_method === 'transfer' ? '이체' : res.balance_payment_method === 'card' ? '카드' : res.balance_payment_method === 'cash' ? '현금' : res.balance_payment_method === 'place' ? '플레이스' : res.balance_payment_method === 'store' ? '스토어' : res.balance_payment_method === 'social' ? '소셜' : null
+                                        const mLabel = (m: string | null | undefined) => m === 'transfer' ? '이체' : m === 'card' ? '카드' : m === 'cash' ? '현금' : m === 'place' ? '플레이스' : m === 'store' ? '스토어' : m === 'social' ? '소셜' : null
+                                        const splitPayments = Array.isArray(res.balance_payments) ? res.balance_payments.filter((p: any) => p?.method && p.method !== 'none') : []
+                                        const isSplit = splitPayments.length > 0
+                                        const settled = isSplit || (!!res.balance_payment_method && res.balance_payment_method !== 'none')
+                                        const methodLabel = isSplit
+                                            ? splitPayments.map((p: any) => mLabel(p.method)).filter(Boolean).join('+')
+                                            : mLabel(res.balance_payment_method)
                                         return (
                                         <TableCell className="whitespace-nowrap">
                                             <div className={`flex flex-col space-y-1.5 text-xs p-2 rounded-md border min-w-[150px] shadow-sm ${settled ? "bg-green-50 border-green-200 border-l-[3px] border-l-green-400" : "bg-slate-50/50 border-slate-200"}`}>
