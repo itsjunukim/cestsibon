@@ -1,7 +1,7 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Users, DollarSign, Activity, CalendarDays, Lock, Wallet, ReceiptText, MapPin, Clock, ChevronRight, TrendingUp, CreditCard, Store, Share2 } from "lucide-react"
+import { Users, DollarSign, Activity, CalendarDays, Lock, Wallet, ReceiptText, MapPin, Clock, ChevronRight, TrendingUp, CreditCard, Store, Share2, PiggyBank } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { useQuery } from "@tanstack/react-query"
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, startOfDay, endOfDay, isSameDay, addDays, differenceInCalendarDays } from "date-fns"
@@ -120,7 +120,7 @@ export default function DashboardPage() {
     queryFn: async () => {
       const { data: reservations, error } = await supabase
         .from("reservations")
-        .select("date, total_amount, deposit, is_deposit_paid, status, customer_name, reservation_type, headcount, balance_payment_method")
+        .select("date, total_amount, deposit, is_deposit_paid, status, customer_name, reservation_type, headcount, balance_payment_method, balance_payments")
         .gte("date", startStr)
         .lte("date", endStr)
         .neq("status", "cancelled")
@@ -129,7 +129,7 @@ export default function DashboardPage() {
       if (error) {
         console.error("Error fetching reservations:", error)
         return {
-          totalSales: 0, activeReservations: 0, visitorCount: 0,
+          totalSales: 0, expectedSales: 0, activeReservations: 0, visitorCount: 0,
           avgPerReservation: 0, avgPerVisitor: 0, unpaidDepositTotal: 0,
           chartData: [], weekdayChart: [],
           salesBreakdown: { transfer: 0, cash: 0, card: 0, place: 0, social: 0, store: 0 }
@@ -137,46 +137,70 @@ export default function DashboardPage() {
       }
 
       let totalSales = 0
+      let expectedSales = 0
       let unpaidDepositTotal = 0
       const salesBreakdown = { transfer: 0, cash: 0, card: 0, place: 0, social: 0, store: 0 }
       const chartMap: Record<string, number> = {}
       const weekdaySales = [0, 0, 0, 0, 0, 0, 0]
 
+      const addToBreakdown = (method: string | null | undefined, amount: number) => {
+        if (!method || amount <= 0) return
+        if (method === 'transfer') salesBreakdown.transfer += amount
+        else if (method === 'cash') salesBreakdown.cash += amount
+        else if (method === 'card') salesBreakdown.card += amount
+        else if (method === 'place') salesBreakdown.place += amount
+        else if (method === 'social') salesBreakdown.social += amount
+        else if (method === 'store') salesBreakdown.store += amount
+      }
+
       reservations?.forEach(res => {
-        let total = Number(res.total_amount) || 0
+        const total = Number(res.total_amount) || 0
         const deposit = Number(res.deposit) || 0
         const balance = total - deposit
-        const method = res.balance_payment_method
+        const legacyMethod = res.balance_payment_method
+        const splitPayments = Array.isArray(res.balance_payments) ? res.balance_payments : []
 
-        let isUnpaidDeposit = false
-        if (!res.is_deposit_paid && res.status === 'booked' && deposit > 0) {
-            isUnpaidDeposit = true
+        // 총 예상 매출: 미입금 예약금 + 미정산 잔금까지 전부 포함
+        expectedSales += total
+
+        // --- 실현(정산 완료) 매출 계산 ---
+        let realized = 0
+
+        // 예약금: booked + 미입금이면 제외, 그 외엔 실현으로 인정
+        const isUnpaidDeposit = !res.is_deposit_paid && res.status === 'booked' && deposit > 0
+        if (isUnpaidDeposit) {
             unpaidDepositTotal += deposit
-            total -= deposit // 미입금 예약금은 매출(total)에서 제외
-        }
-
-        totalSales += total
-
-        // 예약금이 입금 완료된 경우만 계좌이체 매출로 집계
-        if (deposit > 0 && !isUnpaidDeposit) {
+        } else if (deposit > 0) {
+            realized += deposit
             salesBreakdown.transfer += deposit
         }
 
+        // 잔금: 결제수단이 확정(정산)된 부분만 실현으로 인정, 미정산은 제외
         if (balance > 0) {
-            if (method === 'transfer') salesBreakdown.transfer += balance
-            else if (method === 'cash') salesBreakdown.cash += balance
-            else if (method === 'card') salesBreakdown.card += balance
-            else if (method === 'place') salesBreakdown.place += balance
-            else if (method === 'social') salesBreakdown.social += balance
-            else if (method === 'store') salesBreakdown.store += balance
+            if (splitPayments.length > 0) {
+                splitPayments.forEach((p: any) => {
+                    const m = p?.method
+                    const amt = Number(p?.amount) || 0
+                    if (m && m !== 'none' && amt > 0) {
+                        realized += amt
+                        addToBreakdown(m, amt)
+                    }
+                })
+            } else if (legacyMethod && legacyMethod !== 'none' && legacyMethod !== '') {
+                realized += balance
+                addToBreakdown(legacyMethod, balance)
+            }
+            // else: 미정산 잔금 → 실현 매출에서 제외
         }
+
+        totalSales += realized
 
         if (res.date) {
             if (!chartMap[res.date]) chartMap[res.date] = 0
-            chartMap[res.date] += total
-            
+            chartMap[res.date] += realized
+
             const wd = new Date(res.date).getDay()
-            weekdaySales[wd] += total
+            weekdaySales[wd] += realized
         }
       })
 
@@ -201,7 +225,7 @@ export default function DashboardPage() {
       }))
 
       return {
-        totalSales, activeReservations, visitorCount,
+        totalSales, expectedSales, activeReservations, visitorCount,
         avgPerReservation, avgPerVisitor, unpaidDepositTotal,
         chartData, weekdayChart, salesBreakdown,
       }
@@ -241,7 +265,7 @@ export default function DashboardPage() {
   })
 
   const finalStats = stats || {
-    totalSales: 0, activeReservations: 0, visitorCount: 0,
+    totalSales: 0, expectedSales: 0, activeReservations: 0, visitorCount: 0,
     avgPerReservation: 0, avgPerVisitor: 0, unpaidDepositTotal: 0,
     chartData: [], weekdayChart: [],
     salesBreakdown: { transfer: 0, cash: 0, card: 0, place: 0, social: 0, store: 0 }
@@ -311,13 +335,21 @@ export default function DashboardPage() {
       <div className="relative">
         <div className={cn("space-y-6 transition-all duration-300", !isUnlocked && "blur-md select-none pointer-events-none")}>
           {/* KPI Grid (Top) */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <KPICard
+              label="총 예상 매출"
+              value={formatWon(finalStats.expectedSales)}
+              icon={PiggyBank}
+              tone="violet"
+              hint="미정산·미입금 모두 포함"
+              onClick={() => handleNavigateWithFilter()}
+            />
             <KPICard
               label="총 매출"
               value={formatWon(finalStats.totalSales)}
               icon={DollarSign}
               tone="indigo"
-              hint="기간 내 총 매출"
+              hint="정산 완료된 실현 매출"
               onClick={() => handleNavigateWithFilter()}
             />
             <KPICard

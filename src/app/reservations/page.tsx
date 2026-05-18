@@ -314,12 +314,17 @@ function ReservationsContent() {
             const total = Number(res.total_amount) || 0
             const deposit = Number(res.deposit) || 0
             const balance = total - deposit
-            const method = res.balance_payment_method
-            
+            const legacyMethod = res.balance_payment_method
+            const splitPayments = Array.isArray(res.balance_payments) ? res.balance_payments : []
+
+            const balanceMatchesFilter = splitPayments.length > 0
+                ? splitPayments.some((p: any) => p?.method === paymentFilter && (Number(p?.amount) || 0) > 0)
+                : (balance > 0 && legacyMethod === paymentFilter)
+
             if (paymentFilter === 'transfer') {
-                if (!(deposit > 0 || (balance > 0 && method === 'transfer'))) return false;
+                if (!(deposit > 0 || balanceMatchesFilter)) return false;
             } else {
-                if (!(balance > 0 && method === paymentFilter)) return false;
+                if (!balanceMatchesFilter) return false;
             }
         }
         

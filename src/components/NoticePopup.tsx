@@ -18,8 +18,8 @@ export function NoticePopup() {
             return
         }
 
-        const hideNoticePermanently = localStorage.getItem("hideUpdateNotice_202605_v5")
-        const hideNoticeThisSession = sessionStorage.getItem("hideUpdateNoticeSession_202605_v5")
+        const hideNoticePermanently = localStorage.getItem("hideUpdateNotice_202605_v6")
+        const hideNoticeThisSession = sessionStorage.getItem("hideUpdateNoticeSession_202605_v6")
 
         if (!hideNoticePermanently && !hideNoticeThisSession) {
             // Small delay to let page render first
@@ -32,10 +32,10 @@ export function NoticePopup() {
 
     const handleClose = () => {
         if (doNotShow) {
-            localStorage.setItem("hideUpdateNotice_202605_v5", "true")
+            localStorage.setItem("hideUpdateNotice_202605_v6", "true")
         } else {
             // 세션 스토리지에 저장하여, 탭을 닫거나 재로그인하기 전까지는 다시 안 뜨게 함
-            sessionStorage.setItem("hideUpdateNoticeSession_202605_v5", "true")
+            sessionStorage.setItem("hideUpdateNoticeSession_202605_v6", "true")
         }
         setOpen(false)
     }
@@ -56,12 +56,16 @@ export function NoticePopup() {
                 </DialogHeader>
                 <div className="space-y-3 py-4 text-sm text-slate-700">
                     <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                        <h4 className="font-bold text-sm mb-1 text-slate-800">1. 영업 현황 대시보드 전면 개편</h4>
-                        <p className="leading-relaxed text-slate-600 text-xs">기간을 <b>자유롭게 선택</b>해 조회할 수 있고, KPI 카드(평균 단가·객단가·미입금 등) 및 <b>요일별 매출 차트</b>가 추가되었습니다. 디자인도 SaaS 스타일로 정돈했습니다.</p>
+                        <h4 className="font-bold text-sm mb-1 text-slate-800">1. 차액 분할 결제 기능</h4>
+                        <p className="leading-relaxed text-slate-600 text-xs">잔금을 여러 결제수단으로 나눠 받을 수 있습니다. (최대 5개, 예: 카드 30만 + 계좌이체 20만) 차액 결제 수단 옆 <b>[+] 버튼</b>으로 분할 결제 창이 열립니다.</p>
                     </div>
                     <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                        <h4 className="font-bold text-sm mb-1 text-slate-800">2. 내일 예약 현황 간편 공유 기능</h4>
-                        <p className="leading-relaxed text-slate-600 text-xs">예약 관리 상단의 <b>[공유] 버튼</b>으로 내일 예약 목록을 단체 톡방 등에 손쉽게 공유할 수 있습니다.</p>
+                        <h4 className="font-bold text-sm mb-1 text-slate-800">2. 결제수단별 매출 통계 연동</h4>
+                        <p className="leading-relaxed text-slate-600 text-xs">영업 현황 대시보드의 결제수단별 매출이 분할 결제 금액까지 <b>정확하게 나눠서 합산</b>됩니다.</p>
+                    </div>
+                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                        <h4 className="font-bold text-sm mb-1 text-slate-800">3. 총 예상 매출 카드 신설</h4>
+                        <p className="leading-relaxed text-slate-600 text-xs"><b>총 예상 매출</b>은 미정산·미입금 금액까지 포함한 전체 예상 매출, <b>총 매출</b>은 정산 완료된 실현 매출(미정산 잔금·미입금 예약금 제외)로 구분됩니다.</p>
                     </div>
                 </div>
                 <DialogFooter className="flex flex-row justify-between items-center border-t border-slate-100 pt-3 sm:pt-4">

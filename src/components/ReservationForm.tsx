@@ -1,6 +1,6 @@
 "use client"
 
-import { useForm } from "react-hook-form"
+import { useForm, useFieldArray } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Button } from "@/components/ui/button"
@@ -22,9 +22,10 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { useState, useEffect, useRef } from "react"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { format } from "date-fns"
 import { ko } from "date-fns/locale"
-import { CalendarIcon, X } from "lucide-react"
+import { CalendarIcon, X, Split, Undo2, Plus, Check, Pencil } from "lucide-react"
 import { cn, formatPhone } from "@/lib/utils"
 import { Textarea } from "@/components/ui/textarea"
 import { ReservationAlertDialog } from "@/components/ReservationAlertDialog"
@@ -46,6 +47,10 @@ const formSchema = z.object({
     total_amount: z.string(), // Changed to string
     deposit: z.string(), // Changed to string
     balance_payment_method: z.string().optional(),
+    balance_payments: z.array(z.object({
+        method: z.string().min(1, "수단 필수"),
+        amount: z.string().min(1, "금액 필수")
+    })).optional(),
     is_deposit_paid: z.boolean().optional(),
     deposit_paid_date: z.date().optional(),
     is_visited: z.boolean().optional(),
@@ -71,6 +76,7 @@ export interface ReservationData {
     total_amount?: number | string | null
     deposit?: number | string | null
     balance_payment_method?: string | null
+    balance_payments?: any[] | null
     is_deposit_paid?: boolean | null
     deposit_paid_date?: string | Date | null
     is_visited?: boolean | null
@@ -92,6 +98,8 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
     const [isLoading, setIsLoading] = useState(false)
     const [isCalendarOpen, setIsCalendarOpen] = useState(false)
     const [typeSelected, setTypeSelected] = useState(!!initialData)
+    const [isSplitModalOpen, setIsSplitModalOpen] = useState(false)
+    const [splitDraft, setSplitDraft] = useState<{ method: string; amount: string }[]>([])
     const queryClient = useQueryClient()
     const supabase = createClient()
 
@@ -141,6 +149,9 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
             total_amount: initialData?.total_amount ? String(initialData.total_amount) : "0",
             deposit: initialData?.deposit ? String(initialData.deposit) : "0",
             balance_payment_method: initialData?.balance_payment_method || "",
+            balance_payments: initialData?.balance_payments ? 
+                initialData.balance_payments.map((p: any) => ({ method: p.method, amount: String(p.amount) })) : 
+                (initialData?.balance_payment_method ? [{ method: initialData.balance_payment_method, amount: String(Math.max(0, Number(initialData.total_amount) - Number(initialData.deposit))) }] : []),
             is_deposit_paid: initialData?.is_deposit_paid || false,
             deposit_paid_date: initialData?.deposit_paid_date ? new Date(initialData.deposit_paid_date) : undefined,
             is_visited: initialData?.is_visited || false,
@@ -189,6 +200,11 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
         form.setValue("selected_rooms", []);
     }, [selectedAccommodationId, form])
 
+    const { fields: balanceFields, append: appendBalance, remove: removeBalance } = useFieldArray({
+        control: form.control,
+        name: "balance_payments"
+    })
+
     // 정산 데이터가 로드되면 폼에 반영
     useEffect(() => {
         if (settlements && settlements.length > 0) {
@@ -223,7 +239,13 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                 total_amount: Number(String(reservationData.total_amount).replace(/[^0-9]/g, '')),
                 deposit: Number(String(reservationData.deposit).replace(/[^0-9]/g, '')),
                 balance: balance,
-                balance_payment_method: reservationData.balance_payment_method || null,
+                balance_payments: reservationData.balance_payments ? reservationData.balance_payments.map(p => ({
+                    method: p.method,
+                    amount: Number(String(p.amount).replace(/[^0-9]/g, ''))
+                })) : null,
+                balance_payment_method: (reservationData.balance_payments && reservationData.balance_payments.length > 0) 
+                    ? reservationData.balance_payments[0].method 
+                    : null,
                 is_deposit_paid: reservationData.is_deposit_paid || false,
                 deposit_paid_date: reservationData.deposit_paid_date ? format(reservationData.deposit_paid_date, "yyyy-MM-dd") : null,
                 is_visited: reservationData.is_visited || false,
@@ -231,8 +253,25 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                 room_id: null,
             }
 
+            if (formattedValues.balance_payments) {
+                formattedValues.balance_payments = formattedValues.balance_payments.filter((p: any) => p.method !== 'none');
+                if (formattedValues.balance_payments.length === 1) {
+                    formattedValues.balance_payments[0].amount = balance;
+                }
+            }
+
             let error;
             let currentReservationId = initialData?.id;
+
+            // 분할 결제 합계 검증
+            if (formattedValues.balance_payments && formattedValues.balance_payments.length > 0) {
+                const currentSum = formattedValues.balance_payments.reduce((acc, curr) => acc + curr.amount, 0);
+                if (currentSum !== balance) {
+                    alert(`결제 수단 분할 금액 합계(${currentSum.toLocaleString()}원)가 남은 차액(${balance.toLocaleString()}원)과 일치하지 않습니다.`);
+                    setIsLoading(false);
+                    return;
+                }
+            }
 
             if (initialData?.id) {
                 const { error: updateError } = await supabase
@@ -777,10 +816,12 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                                 name="deposit"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel className="font-bold text-slate-700">예약금</FormLabel>
+                                        <div className="flex items-center h-7">
+                                            <FormLabel className="font-bold text-slate-700">예약금</FormLabel>
+                                        </div>
                                         <FormControl>
                                             <div className="relative flex items-center">
-                                                <Input type="text" placeholder="0" className="bg-white pr-8 text-right" {...field} onChange={(e) => {
+                                                <Input type="text" placeholder="0" className="h-11 bg-white pr-8 text-right" {...field} onChange={(e) => {
                                                     const raw = e.target.value.replace(/[^0-9]/g, "");
                                                     field.onChange(raw ? Number(raw).toLocaleString() : "");
                                                 }} value={field.value ? Number(String(field.value).replace(/[^0-9]/g, "")).toLocaleString() : ""} />
@@ -868,40 +909,252 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                                 </div>
                             </div>
 
-                            {balance > 0 && (
-                                <FormField
-                                    control={form.control}
-                                    name="balance_payment_method"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel className="font-bold text-slate-700">차액 결제 수단 확정</FormLabel>
-                                            <Select 
-                                                onValueChange={(val) => field.onChange(val === "none" ? undefined : val)} 
-                                                defaultValue={field.value || "none"}
-                                            >
-                                                <FormControl>
-                                                    <SelectTrigger className="h-10 bg-white shadow-sm">
-                                                        <SelectValue placeholder="결제 수단 선택" />
-                                                    </SelectTrigger>
-                                                </FormControl>
-                                                <SelectContent>
-                                                    <SelectItem value="none">미정 (현장결제 혹은 추후)</SelectItem>
-                                                    <SelectItem value="transfer">계좌이체</SelectItem>
-                                                    <SelectItem value="card">카드 결제</SelectItem>
-                                                    <SelectItem value="cash">현금 결제</SelectItem>
-                                                    <SelectItem value="place">플레이스 결제</SelectItem>
-                                                    <SelectItem value="store">스토어 결제</SelectItem>
-                                                    <SelectItem value="social">소셜 결제</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
+                            {balance > 0 && balanceFields.length <= 1 && (
+                                <FormItem>
+                                    <div className="flex items-center justify-between h-7">
+                                        <FormLabel className="font-bold text-slate-700">차액 결제 수단</FormLabel>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
+                                            title="분할 결제"
+                                            onClick={() => {
+                                                const current = form.getValues('balance_payments') || [];
+                                                const firstMethod = current[0]?.method || 'transfer';
+                                                const nextMethod = ['transfer', 'card', 'cash', 'place', 'store', 'social'].find(m => m !== firstMethod) || 'card';
+                                                setSplitDraft([
+                                                    { method: firstMethod, amount: '0' },
+                                                    { method: nextMethod, amount: '0' },
+                                                ]);
+                                                setIsSplitModalOpen(true);
+                                            }}
+                                        >
+                                            <Plus className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                    <Select 
+                                        onValueChange={(val) => {
+                                            if (val === "none") {
+                                                if (balanceFields.length > 0) removeBalance(0);
+                                            } else {
+                                                if (balanceFields.length === 0) {
+                                                    appendBalance({ method: val, amount: String(balance) });
+                                                } else {
+                                                    form.setValue(`balance_payments.0.method`, val);
+                                                }
+                                            }
+                                        }} 
+                                        value={balanceFields.length > 0 ? balanceFields[0].method : "none"}
+                                    >
+                                        <FormControl>
+                                            <SelectTrigger className="data-[size=default]:h-11 bg-white shadow-sm">
+                                                <SelectValue placeholder="결제 수단 선택" />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            <SelectItem value="none">미정 (현장결제 혹은 추후)</SelectItem>
+                                            <SelectItem value="transfer">계좌이체</SelectItem>
+                                            <SelectItem value="card">카드 결제</SelectItem>
+                                            <SelectItem value="cash">현금 결제</SelectItem>
+                                            <SelectItem value="place">플레이스 결제</SelectItem>
+                                            <SelectItem value="store">스토어 결제</SelectItem>
+                                            <SelectItem value="social">소셜 결제</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+
+                            {balance > 0 && balanceFields.length > 1 && (
+                                <FormItem>
+                                    <div className="flex items-center justify-between h-7">
+                                        <FormLabel className="font-bold text-slate-700">차액 결제 수단</FormLabel>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
+                                            title="내역 수정"
+                                            onClick={() => {
+                                                const current = form.getValues('balance_payments') || [];
+                                                setSplitDraft(current.map(p => ({ method: p.method, amount: String(p.amount) })));
+                                                setIsSplitModalOpen(true);
+                                            }}
+                                        >
+                                            <Pencil className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 gap-2">
+                                        {balanceFields.map((field, index) => (
+                                            <div key={field.id} className="relative flex items-center justify-between bg-white px-4 py-3 border border-slate-200 rounded-md shadow-sm border-l-4 border-l-indigo-500">
+                                                <div className="font-semibold text-slate-800 text-sm">
+                                                    {field.method === 'transfer' ? '계좌이체' : field.method === 'card' ? '카드 결제' : field.method === 'cash' ? '현금 결제' : field.method === 'place' ? '플레이스 결제' : field.method === 'store' ? '스토어 결제' : field.method === 'social' ? '소셜 결제' : '미정'}
+                                                </div>
+                                                <div className="text-indigo-600 font-bold text-sm bg-indigo-50 px-2 py-1 rounded-md">
+                                                    {Number(String(field.amount).replace(/[^0-9]/g, '') || 0).toLocaleString()}원
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </FormItem>
                             )}
                         </div>
-                    </div>
+                    </div> {/* End of Grid */}
 
+                    <Dialog open={isSplitModalOpen} onOpenChange={(open) => {
+                        if (!open) setSplitDraft([]);
+                        setIsSplitModalOpen(open);
+                    }}>
+                        <DialogContent className="sm:max-w-[450px]">
+                            <DialogHeader>
+                                <DialogTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                    <Split className="h-5 w-5 text-indigo-500" />
+                                    차액 분할 결제
+                                </DialogTitle>
+                            </DialogHeader>
+                            <div className="py-4 space-y-4">
+                                <div className="flex justify-between items-center bg-red-50 p-3 rounded-lg border border-red-100">
+                                    <span className="font-semibold text-slate-700">총 분할 결제 금액</span>
+                                    <span className="font-bold text-red-600 text-lg">{balance.toLocaleString()}원</span>
+                                </div>
+                                <div className="space-y-3 pt-2">
+                                    {splitDraft.map((entry, index) => {
+                                        const usedMethods = splitDraft.map(p => p.method);
+                                        return (
+                                            <div key={index} className="flex items-center gap-2 bg-slate-50 p-2 rounded-md border border-slate-200">
+                                                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-200 text-slate-600 text-[10px] font-bold shrink-0">
+                                                    {index + 1}
+                                                </span>
+                                                <div className="w-[100px] shrink-0">
+                                                    <Select
+                                                        value={entry.method}
+                                                        onValueChange={(val) => {
+                                                            setSplitDraft(prev => prev.map((p, i) => i === index ? { ...p, method: val } : p));
+                                                        }}
+                                                    >
+                                                        <SelectTrigger className="h-9 bg-white text-sm font-semibold">
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="transfer" disabled={usedMethods.includes('transfer') && entry.method !== 'transfer'}>계좌이체</SelectItem>
+                                                            <SelectItem value="card" disabled={usedMethods.includes('card') && entry.method !== 'card'}>카드</SelectItem>
+                                                            <SelectItem value="cash" disabled={usedMethods.includes('cash') && entry.method !== 'cash'}>현금</SelectItem>
+                                                            <SelectItem value="place" disabled={usedMethods.includes('place') && entry.method !== 'place'}>플레이스</SelectItem>
+                                                            <SelectItem value="store" disabled={usedMethods.includes('store') && entry.method !== 'store'}>스토어</SelectItem>
+                                                            <SelectItem value="social" disabled={usedMethods.includes('social') && entry.method !== 'social'}>소셜</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                                <div className="relative flex-1">
+                                                    <Input
+                                                        type="text"
+                                                        placeholder="0"
+                                                        className="h-9 text-right pr-6 tabular-nums bg-white font-bold"
+                                                        value={entry.amount ? Number(entry.amount).toLocaleString() : ""}
+                                                        onChange={(e) => {
+                                                            const val = e.target.value.replace(/[^0-9]/g, '');
+                                                            setSplitDraft(prev => {
+                                                                const next = prev.map((p, i) => i === index ? { ...p, amount: val } : p);
+                                                                // 첫 행 변경 시 두 번째 행을 잔여로 자동 채움
+                                                                if (index === 0 && next.length >= 2) {
+                                                                    const firstVal = Number(val) || 0;
+                                                                    const otherSum = next.reduce((acc, curr, i) => {
+                                                                        if (i === 0 || i === 1) return acc;
+                                                                        return acc + (Number(String(curr.amount).replace(/[^0-9]/g, '')) || 0);
+                                                                    }, 0);
+                                                                    const remainder = Math.max(0, balance - firstVal - otherSum);
+                                                                    next[1] = { ...next[1], amount: String(remainder) };
+                                                                }
+                                                                return next;
+                                                            });
+                                                        }}
+                                                    />
+                                                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-slate-400 font-bold pointer-events-none">원</span>
+                                                </div>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-slate-400 hover:text-red-500 hover:bg-red-50 shrink-0 rounded"
+                                                    onClick={() => setSplitDraft(prev => prev.filter((_, i) => i !== index))}
+                                                >
+                                                    <X className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                <div className="flex justify-center pt-2">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={splitDraft.length >= 5}
+                                        className="h-8 px-4 text-xs font-semibold text-indigo-600 border-indigo-200 hover:bg-indigo-50 shadow-sm disabled:text-slate-400"
+                                        onClick={() => {
+                                            const usedMethods = splitDraft.map(p => p.method);
+                                            const allMethods = ['transfer', 'card', 'cash', 'place', 'store', 'social'];
+                                            const nextMethod = allMethods.find(m => !usedMethods.includes(m));
+                                            if (nextMethod) {
+                                                const currentSum = splitDraft.reduce((acc, curr) => acc + (Number(String(curr.amount).replace(/[^0-9]/g, '')) || 0), 0);
+                                                const remain = balance - currentSum;
+                                                setSplitDraft(prev => [...prev, { method: nextMethod, amount: String(Math.max(0, remain)) }]);
+                                            }
+                                        }}
+                                    >
+                                        <Plus className="h-3 w-3 mr-1" /> 결제 수단 추가
+                                        {splitDraft.length >= 5 && <span className="ml-1 text-[10px]">(최대 5개)</span>}
+                                    </Button>
+                                </div>
+                                <div className="pt-4 border-t border-slate-100 flex justify-between items-center bg-slate-50 p-3 rounded-lg border-b">
+                                    <span className="text-sm font-semibold text-slate-600">현재 입력 합계</span>
+                                    {(() => {
+                                        const currentSum = splitDraft.reduce((acc, curr) => acc + (Number(String(curr.amount).replace(/[^0-9]/g, '')) || 0), 0);
+                                        const matched = currentSum === balance;
+                                        return (
+                                            <div className="text-right">
+                                                <div className={cn("text-lg font-bold tabular-nums", matched ? "text-emerald-600" : "text-rose-500")}>
+                                                    {currentSum.toLocaleString()}원
+                                                </div>
+                                                {!matched && (
+                                                    <div className="text-[11px] font-bold text-rose-500 mt-0.5">
+                                                        차액: {balance.toLocaleString()}원 (불일치)
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                {(() => {
+                                    const hasZero = splitDraft.some(p => Number(String(p.amount).replace(/[^0-9]/g, '')) === 0);
+                                    const isEmpty = splitDraft.length === 0;
+                                    const disabled = hasZero || isEmpty;
+                                    return (
+                                        <Button
+                                            type="button"
+                                            className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold h-11 disabled:bg-slate-300 disabled:text-slate-500"
+                                            onClick={() => {
+                                                // 분할 draft를 form 상태에 commit (useFieldArray 교체)
+                                                const existing = form.getValues('balance_payments') || [];
+                                                // 기존 모두 제거 후 새로 append
+                                                for (let i = existing.length - 1; i >= 0; i--) removeBalance(i);
+                                                splitDraft.forEach(p => appendBalance({ method: p.method, amount: p.amount }));
+                                                setSplitDraft([]);
+                                                setIsSplitModalOpen(false);
+                                            }}
+                                            disabled={disabled}
+                                        >
+                                            {isEmpty ? "결제 수단을 추가해주세요" : hasZero ? "금액을 입력해주세요" : "입력 완료"}
+                                        </Button>
+                                    );
+                                })()}
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
                     <div className="flex justify-center pt-4 border-t border-slate-200/80 mt-6">
                         <div className="grid grid-cols-3 gap-2">
                             {([1, -1] as const).flatMap((sign) =>
