@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1778597943749,
+  "lastScanned": 1779113977523,
   "projectRoot": "/Users/junukim/repo/cestsibon",
   "techStack": {
     "languages": [
@@ -78,7 +78,7 @@
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 8,
-      "lastAccessed": 1778597943732,
+      "lastAccessed": 1779113977513,
       "keyFiles": [
         "ADMIN_GUIDE.md",
         "ADMIN_TASK_PLAN.md",
@@ -91,7 +91,7 @@
       "path": "public",
       "purpose": "Public files",
       "fileCount": 6,
-      "lastAccessed": 1778597943732,
+      "lastAccessed": 1779113977513,
       "keyFiles": [
         "file.svg",
         "globe.svg",
@@ -104,7 +104,7 @@
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1778597943736,
+      "lastAccessed": 1779113977515,
       "keyFiles": [
         "middleware.ts"
       ]
@@ -113,7 +113,7 @@
       "path": "supabase",
       "purpose": null,
       "fileCount": 2,
-      "lastAccessed": 1778597943736,
+      "lastAccessed": 1779113977515,
       "keyFiles": [
         "config.toml"
       ]
@@ -122,7 +122,7 @@
       "path": "src/app",
       "purpose": "Application code",
       "fileCount": 5,
-      "lastAccessed": 1778597943737,
+      "lastAccessed": 1779113977516,
       "keyFiles": [
         "favicon.ico",
         "globals.css",
@@ -133,7 +133,7 @@
       "path": "src/components",
       "purpose": "UI components",
       "fileCount": 15,
-      "lastAccessed": 1778597943737,
+      "lastAccessed": 1779113977516,
       "keyFiles": [
         "AccommodationForm.tsx",
         "DateRangePicker.tsx",
@@ -144,7 +144,7 @@
       "path": "src/lib",
       "purpose": "Library code",
       "fileCount": 2,
-      "lastAccessed": 1778597943737,
+      "lastAccessed": 1779113977516,
       "keyFiles": [
         "supabase.ts",
         "utils.ts"
@@ -154,20 +154,20 @@
   "hotPaths": [
     {
       "path": "src/components/ReservationForm.tsx",
-      "accessCount": 72,
-      "lastAccessed": 1778295558246,
+      "accessCount": 97,
+      "lastAccessed": 1779117629384,
       "type": "file"
     },
     {
       "path": "src/app/reservations/page.tsx",
-      "accessCount": 67,
-      "lastAccessed": 1778297247012,
+      "accessCount": 72,
+      "lastAccessed": 1779119254208,
       "type": "file"
     },
     {
       "path": "src/app/page.tsx",
-      "accessCount": 37,
-      "lastAccessed": 1778511167581,
+      "accessCount": 56,
+      "lastAccessed": 1779118119186,
       "type": "file"
     },
     {
@@ -220,8 +220,8 @@
     },
     {
       "path": "src/components/NoticePopup.tsx",
-      "accessCount": 8,
-      "lastAccessed": 1778511610680,
+      "accessCount": 10,
+      "lastAccessed": 1779118566682,
       "type": "file"
     },
     {
@@ -288,6 +288,12 @@
       "path": "src/app/admin/users/actions.ts",
       "accessCount": 3,
       "lastAccessed": 1778295230417,
+      "type": "file"
+    },
+    {
+      "path": "update_daily_settlements.sql",
+      "accessCount": 3,
+      "lastAccessed": 1779117364850,
       "type": "file"
     },
     {
@@ -438,6 +444,12 @@
       "path": "src/components/StatsChart.tsx",
       "accessCount": 1,
       "lastAccessed": 1778509923848,
+      "type": "file"
+    },
+    {
+      "path": "src/components/ui/form.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1779116649040,
       "type": "file"
     }
   ],

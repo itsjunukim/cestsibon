@@ -922,10 +922,9 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                                             onClick={() => {
                                                 const current = form.getValues('balance_payments') || [];
                                                 const firstMethod = current[0]?.method || 'transfer';
-                                                const nextMethod = ['transfer', 'card', 'cash', 'place', 'store', 'social'].find(m => m !== firstMethod) || 'card';
                                                 setSplitDraft([
                                                     { method: firstMethod, amount: '0' },
-                                                    { method: nextMethod, amount: '0' },
+                                                    { method: 'card', amount: '0' },
                                                 ]);
                                                 setIsSplitModalOpen(true);
                                             }}
@@ -1038,12 +1037,12 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                                                             <SelectValue />
                                                         </SelectTrigger>
                                                         <SelectContent>
-                                                            <SelectItem value="transfer" disabled={usedMethods.includes('transfer') && entry.method !== 'transfer'}>계좌이체</SelectItem>
-                                                            <SelectItem value="card" disabled={usedMethods.includes('card') && entry.method !== 'card'}>카드</SelectItem>
-                                                            <SelectItem value="cash" disabled={usedMethods.includes('cash') && entry.method !== 'cash'}>현금</SelectItem>
-                                                            <SelectItem value="place" disabled={usedMethods.includes('place') && entry.method !== 'place'}>플레이스</SelectItem>
-                                                            <SelectItem value="store" disabled={usedMethods.includes('store') && entry.method !== 'store'}>스토어</SelectItem>
-                                                            <SelectItem value="social" disabled={usedMethods.includes('social') && entry.method !== 'social'}>소셜</SelectItem>
+                                                            <SelectItem value="transfer">계좌이체</SelectItem>
+                                                            <SelectItem value="card">카드</SelectItem>
+                                                            <SelectItem value="cash">현금</SelectItem>
+                                                            <SelectItem value="place">플레이스</SelectItem>
+                                                            <SelectItem value="store">스토어</SelectItem>
+                                                            <SelectItem value="social">소셜</SelectItem>
                                                         </SelectContent>
                                                     </Select>
                                                 </div>
@@ -1094,14 +1093,9 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                                         disabled={splitDraft.length >= 5}
                                         className="h-8 px-4 text-xs font-semibold text-indigo-600 border-indigo-200 hover:bg-indigo-50 shadow-sm disabled:text-slate-400"
                                         onClick={() => {
-                                            const usedMethods = splitDraft.map(p => p.method);
-                                            const allMethods = ['transfer', 'card', 'cash', 'place', 'store', 'social'];
-                                            const nextMethod = allMethods.find(m => !usedMethods.includes(m));
-                                            if (nextMethod) {
-                                                const currentSum = splitDraft.reduce((acc, curr) => acc + (Number(String(curr.amount).replace(/[^0-9]/g, '')) || 0), 0);
-                                                const remain = balance - currentSum;
-                                                setSplitDraft(prev => [...prev, { method: nextMethod, amount: String(Math.max(0, remain)) }]);
-                                            }
+                                            const currentSum = splitDraft.reduce((acc, curr) => acc + (Number(String(curr.amount).replace(/[^0-9]/g, '')) || 0), 0);
+                                            const remain = balance - currentSum;
+                                            setSplitDraft(prev => [...prev, { method: 'card', amount: String(Math.max(0, remain)) }]);
                                         }}
                                     >
                                         <Plus className="h-3 w-3 mr-1" /> 결제 수단 추가
@@ -1132,7 +1126,9 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                                 {(() => {
                                     const hasZero = splitDraft.some(p => Number(String(p.amount).replace(/[^0-9]/g, '')) === 0);
                                     const isEmpty = splitDraft.length === 0;
-                                    const disabled = hasZero || isEmpty;
+                                    const currentSum = splitDraft.reduce((acc, curr) => acc + (Number(String(curr.amount).replace(/[^0-9]/g, '')) || 0), 0);
+                                    const isMismatch = currentSum !== balance;
+                                    const disabled = hasZero || isEmpty || isMismatch;
                                     return (
                                         <Button
                                             type="button"
@@ -1148,7 +1144,7 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                                             }}
                                             disabled={disabled}
                                         >
-                                            {isEmpty ? "결제 수단을 추가해주세요" : hasZero ? "금액을 입력해주세요" : "입력 완료"}
+                                            {isEmpty ? "결제 수단을 추가해주세요" : hasZero ? "금액을 입력해주세요" : isMismatch ? "잔액을 맞춰주세요" : "입력 완료"}
                                         </Button>
                                     );
                                 })()}
