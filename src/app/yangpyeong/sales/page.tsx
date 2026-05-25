@@ -162,7 +162,8 @@ export default function YangpyeongSalesPage() {
                     <CardTitle className="text-base font-semibold text-slate-800">일별 매출</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className="overflow-x-auto">
+                    {/* 데스크탑: 테이블 */}
+                    <div className="hidden md:block overflow-x-auto">
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -209,7 +210,7 @@ export default function YangpyeongSalesPage() {
                                                         className="h-9 text-right tabular-nums" placeholder="0" />
                                                 </TableCell>
                                                 <TableCell className="min-w-[200px] align-top">
-                                                    <Textarea disabled={!isAdmin} value={d.memo}
+                                                    <Textarea readOnly={!isAdmin} value={d.memo}
                                                         rows={1}
                                                         onChange={(e) => patch(d._key, { memo: e.target.value })}
                                                         className="resize-none transition-all duration-150 h-9 min-h-9 py-1.5 leading-6 overflow-hidden whitespace-nowrap text-ellipsis focus:h-24 focus:min-h-24 focus:whitespace-pre-wrap focus:overflow-auto"
@@ -233,6 +234,77 @@ export default function YangpyeongSalesPage() {
                             </TableBody>
                         </Table>
                     </div>
+
+                    {/* 모바일: 카드 리스트 */}
+                    <div className="md:hidden space-y-3">
+                        {isLoading ? (
+                            <div className="py-8 text-center text-sm text-slate-400">불러오는 중...</div>
+                        ) : drafts.length === 0 ? (
+                            <div className="py-8 text-center text-sm text-slate-400">매출 데이터가 없습니다. "행 추가"로 입력하세요.</div>
+                        ) : (
+                            drafts.map(d => {
+                                const rowTotal = num(d.card) + num(d.cash) + num(d.transfer)
+                                return (
+                                    <div key={d._key} className={cn("rounded-xl border p-4 space-y-3", d.dirty ? "border-amber-300 bg-amber-50/40" : "border-slate-200 bg-white")}>
+                                        {/* 날짜 + 총매출 + 액션 */}
+                                        <div className="flex items-center justify-between gap-2">
+                                            <Input type="date" value={d.date} disabled={!isAdmin}
+                                                onChange={(e) => patch(d._key, { date: e.target.value })}
+                                                className="h-9 w-[150px]" />
+                                            <div className="flex items-center gap-1">
+                                                <Button variant="ghost" size="icon" className="h-9 w-9 text-cyan-600 hover:bg-cyan-50 disabled:text-slate-300"
+                                                    title="저장" disabled={!isAdmin || !d.dirty || savingKey === d._key}
+                                                    onClick={() => saveRow(d)}>
+                                                    <Save className="h-4 w-4" />
+                                                </Button>
+                                                <Button variant="ghost" size="icon" className="h-9 w-9 text-rose-500 hover:bg-rose-50"
+                                                    title="삭제" disabled={!isAdmin} onClick={() => deleteRow(d)}>
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between rounded-lg bg-indigo-50/60 border border-indigo-100 px-3 py-2">
+                                            <span className="text-xs font-bold text-indigo-700 uppercase tracking-wider">총매출</span>
+                                            <span className="text-lg font-bold text-indigo-700 tabular-nums">{fmtMoney(rowTotal)}</span>
+                                        </div>
+
+                                        {/* 결제수단별 입력 */}
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <div>
+                                                <label className="text-[11px] font-semibold text-slate-500 block mb-1">카드</label>
+                                                <Input inputMode="numeric" disabled={!isAdmin} value={comma(d.card)}
+                                                    onChange={(e) => patch(d._key, { card: e.target.value.replace(/[^0-9]/g, "") })}
+                                                    className="h-9 text-right tabular-nums" placeholder="0" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[11px] font-semibold text-slate-500 block mb-1">현금</label>
+                                                <Input inputMode="numeric" disabled={!isAdmin} value={comma(d.cash)}
+                                                    onChange={(e) => patch(d._key, { cash: e.target.value.replace(/[^0-9]/g, "") })}
+                                                    className="h-9 text-right tabular-nums" placeholder="0" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[11px] font-semibold text-slate-500 block mb-1">계좌이체</label>
+                                                <Input inputMode="numeric" disabled={!isAdmin} value={comma(d.transfer)}
+                                                    onChange={(e) => patch(d._key, { transfer: e.target.value.replace(/[^0-9]/g, "") })}
+                                                    className="h-9 text-right tabular-nums" placeholder="0" />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="text-[11px] font-semibold text-slate-500 block mb-1">메모</label>
+                                            <Textarea readOnly={!isAdmin} value={d.memo}
+                                                rows={2}
+                                                onChange={(e) => patch(d._key, { memo: e.target.value })}
+                                                className="resize-none min-h-[60px]"
+                                                placeholder="내용 메모" />
+                                        </div>
+                                    </div>
+                                )
+                            })
+                        )}
+                    </div>
+
                     {drafts.some(d => d.dirty) && (
                         <p className="text-xs text-amber-600 font-semibold mt-3">
                             * 노란색 행은 저장되지 않은 변경입니다. 각 행의 저장(💾) 버튼을 눌러주세요.
