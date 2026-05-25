@@ -45,7 +45,6 @@ const SITE_CONFIG: Record<SiteKey, { home: string; logo: string; title: string; 
         items: [
             { icon: LayoutDashboard, label: "영업 현황", href: "/yangpyeong" },
             { icon: CreditCard, label: "매출 현황", href: "/yangpyeong/sales" },
-            { icon: Ticket, label: "이용권 관리", href: "/yangpyeong/products" },
         ],
     },
 }

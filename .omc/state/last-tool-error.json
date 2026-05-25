@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"SUPABASE_URL=\\\"https://dhnqfdmqmzwvpafqxgeo.supabase.co\\\"\\nSVC=\\\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRobnFmZG1xbXp3dnBhZnF4Z2VvIiwicm9sZSI6InNlcnZpY2Vfcm...",
+  "error": "Exit code 1\n(eval):3: bad math expression: operator expected at `aa5-fa59-4...'",
+  "timestamp": "2026-05-25T05:46:13.071Z",
+  "retry_count": 1
+}

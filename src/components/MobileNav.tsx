@@ -51,12 +51,10 @@ const SITE_MENU: Record<SiteKey, { home: string; logo: string; title: string; su
         full: [
             { icon: LayoutDashboard, label: "영업 현황", href: "/yangpyeong" },
             { icon: CreditCard, label: "매출 현황", href: "/yangpyeong/sales" },
-            { icon: Ticket, label: "이용권 관리", href: "/yangpyeong/products" },
         ],
         bottom: [
             { icon: LayoutDashboard, label: "영업현황", href: "/yangpyeong" },
             { icon: CreditCard, label: "매출현황", href: "/yangpyeong/sales" },
-            { icon: Ticket, label: "이용권", href: "/yangpyeong/products" },
         ],
     },
 }

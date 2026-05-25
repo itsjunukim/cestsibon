@@ -171,15 +171,15 @@
       "type": "file"
     },
     {
-      "path": "src/app/accommodations/page.tsx",
-      "accessCount": 25,
-      "lastAccessed": 1778255156278,
+      "path": "src/components/MobileNav.tsx",
+      "accessCount": 26,
+      "lastAccessed": 1779711601060,
       "type": "file"
     },
     {
-      "path": "src/components/MobileNav.tsx",
+      "path": "src/app/accommodations/page.tsx",
       "accessCount": 25,
-      "lastAccessed": 1779678245574,
+      "lastAccessed": 1778255156278,
       "type": "file"
     },
     {
@@ -214,8 +214,8 @@
     },
     {
       "path": "src/components/Sidebar.tsx",
-      "accessCount": 17,
-      "lastAccessed": 1779678221745,
+      "accessCount": 18,
+      "lastAccessed": 1779711591567,
       "type": "file"
     },
     {
