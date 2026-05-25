@@ -51,7 +51,8 @@ export default function UserManagementPage() {
         password: "",
         name: "",
         phone: "",
-        role: "employee"
+        role: "employee",
+        site: "gapyeong"
     })
 
     const { data: profiles, isLoading } = useQuery({
@@ -80,6 +81,7 @@ export default function UserManagementPage() {
         data.append('name', formData.name)
         data.append('phone', formData.phone)
         data.append('role', formData.role)
+        data.append('site', formData.role === 'super_admin' ? 'all' : formData.site)
 
         const result = await createUser(null, data)
 
@@ -90,7 +92,7 @@ export default function UserManagementPage() {
         } else {
             alert(result.message)
             setIsDialogOpen(false)
-            setFormData({ email: "", password: "", name: "", phone: "", role: "employee" })
+            setFormData({ email: "", password: "", name: "", phone: "", role: "employee", site: "gapyeong" })
             queryClient.invalidateQueries({ queryKey: ["profiles"] })
         }
     }
@@ -170,20 +172,40 @@ export default function UserManagementPage() {
                                     />
                                 </div>
                             </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="role">권한</Label>
-                                <Select
-                                    value={formData.role}
-                                    onValueChange={val => setFormData({ ...formData, role: val })}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="employee">직원 (Employee)</SelectItem>
-                                        <SelectItem value="admin">관리자 (Admin)</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-2">
+                                    <Label htmlFor="role">권한</Label>
+                                    <Select
+                                        value={formData.role}
+                                        onValueChange={val => setFormData({ ...formData, role: val })}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="employee">직원 (Employee)</SelectItem>
+                                            <SelectItem value="admin">관리자 (Admin)</SelectItem>
+                                            <SelectItem value="super_admin">통합 관리자 (Super)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="site">소속 사이트</Label>
+                                    <Select
+                                        value={formData.role === 'super_admin' ? 'all' : formData.site}
+                                        onValueChange={val => setFormData({ ...formData, site: val })}
+                                        disabled={formData.role === 'super_admin'}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {formData.role === 'super_admin' && <SelectItem value="all">전체 (All)</SelectItem>}
+                                            <SelectItem value="gapyeong">가평</SelectItem>
+                                            <SelectItem value="yangpyeong">양평</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             </div>
                             <Button type="submit" className="w-full" disabled={isLoadingAction}>
                                 {isLoadingAction ? "생성 중..." : "계정 생성"}
@@ -206,6 +228,7 @@ export default function UserManagementPage() {
                                 <TableHead>이름</TableHead>
                                 <TableHead>전화번호</TableHead>
                                 <TableHead>권한</TableHead>
+                                <TableHead>소속</TableHead>
                                 <TableHead>생성일</TableHead>
                                 <TableHead className="text-right">관리</TableHead>
                             </TableRow>
@@ -213,7 +236,7 @@ export default function UserManagementPage() {
                         <TableBody>
                             {isLoading ? (
                                 <TableRow>
-                                    <TableCell colSpan={7} className="text-center py-8">
+                                    <TableCell colSpan={8} className="text-center py-8">
                                         불러오는 중...
                                     </TableCell>
                                 </TableRow>
@@ -231,12 +254,19 @@ export default function UserManagementPage() {
                                         <TableCell>{profile.name || "-"}</TableCell>
                                         <TableCell>{profile.phone || "-"}</TableCell>
                                         <TableCell>
-                                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${profile.role === 'admin'
+                                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${profile.role === 'super_admin'
+                                                ? 'bg-indigo-100 text-indigo-800'
+                                                : profile.role === 'admin'
                                                 ? 'bg-purple-100 text-purple-800'
                                                 : 'bg-gray-100 text-gray-800'
                                                 }`}>
-                                                {profile.role === 'admin' ? <ShieldAlert className="h-3 w-3" /> : <UserCog className="h-3 w-3" />}
-                                                {profile.role === 'admin' ? '관리자' : '직원'}
+                                                {profile.role === 'employee' ? <UserCog className="h-3 w-3" /> : <ShieldAlert className="h-3 w-3" />}
+                                                {profile.role === 'super_admin' ? '통합 관리자' : profile.role === 'admin' ? '관리자' : '직원'}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell>
+                                            <span className="text-xs font-medium text-slate-600">
+                                                {profile.site === 'all' ? '전체' : profile.site === 'yangpyeong' ? '양평' : '가평'}
                                             </span>
                                         </TableCell>
                                         <TableCell>{format(new Date(profile.created_at), "yyyy-MM-dd")}</TableCell>

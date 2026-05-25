@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase"
 import { useEffect, useState } from "react"
 import { NotificationBell } from "@/components/NotificationBell"
+import { useUserRole } from "@/hooks/useUserRole"
 import {
     LayoutDashboard,
     BedDouble,
@@ -20,9 +21,42 @@ import {
 
 import { useRouter } from "next/navigation"
 
-export function Sidebar() {
+type SiteKey = "gapyeong" | "yangpyeong"
+
+const SITE_CONFIG: Record<SiteKey, { home: string; logo: string; title: string; subtitle: string; items: { icon: any; label: string; href: string }[] }> = {
+    gapyeong: {
+        home: "/gapyeong",
+        logo: "/logo.png",
+        title: "더 파크 쎄시봉",
+        subtitle: "영업관리시스템",
+        items: [
+            { icon: LayoutDashboard, label: "영업 현황", href: "/gapyeong" },
+            { icon: CalendarDays, label: "예약 관리", href: "/gapyeong/reservations" },
+            { icon: Ticket, label: "이용권 관리", href: "/gapyeong/tickets" },
+            { icon: BedDouble, label: "숙소 관리", href: "/gapyeong/accommodations" },
+            { icon: Calculator, label: "정산 관리", href: "/gapyeong/settlements" },
+        ],
+    },
+    yangpyeong: {
+        home: "/yangpyeong",
+        logo: "/yp-logo.png",
+        title: "쎄시봉 수상레저",
+        subtitle: "영업관리시스템",
+        items: [
+            { icon: LayoutDashboard, label: "영업 현황", href: "/yangpyeong" },
+            { icon: CreditCard, label: "매출 현황", href: "/yangpyeong/sales" },
+            { icon: Ticket, label: "이용권 관리", href: "/yangpyeong/products" },
+        ],
+    },
+}
+
+export function Sidebar({ site = "gapyeong" }: { site?: SiteKey }) {
     const pathname = usePathname()
     const router = useRouter()
+    const config = SITE_CONFIG[site]
+    const { canAccessSite } = useUserRole()
+    const hasBoth = canAccessSite("gapyeong") && canAccessSite("yangpyeong")
+    const logoHref = hasBoth ? "/" : config.home
     const [userRole, setUserRole] = useState<string | null>(null)
     const [email, setEmail] = useState<string>("")
     const supabase = createClient()
@@ -64,15 +98,9 @@ export function Sidebar() {
         }
     }, [])
 
-    const sidebarItems = [
-        { icon: LayoutDashboard, label: "영업 현황", href: "/" },
-        { icon: CalendarDays, label: "예약 관리", href: "/reservations" },
-        { icon: Ticket, label: "이용권 관리", href: "/tickets" },
-        { icon: BedDouble, label: "숙소 관리", href: "/accommodations" },
-        { icon: Calculator, label: "정산 관리", href: "/settlements" },
-    ]
+    const sidebarItems = [...config.items]
 
-    if (userRole === 'admin') {
+    if (userRole === 'super_admin') {
         sidebarItems.push({ icon: Users, label: "계정 관리", href: "/admin/users" })
     }
 
@@ -87,16 +115,16 @@ export function Sidebar() {
     return (
         <div className="flex h-full w-64 flex-col border-r bg-card text-card-foreground shadow-xl">
             <div className="flex h-20 items-center border-b pr-2">
-                <Link href="/" className="flex items-center gap-3 flex-1 h-full px-4 hover:bg-muted/50 transition-colors">
+                <Link href={logoHref} title={hasBoth ? "워크스페이스 선택" : undefined} className="flex items-center gap-3 flex-1 h-full px-4 hover:bg-muted/50 transition-colors">
                     <div className="relative h-14 w-14">
-                        <img src="/logo.png" alt="Logo" className="object-contain w-full h-full" />
+                        <img src={config.logo} alt="Logo" className="object-contain w-full h-full" />
                     </div>
                     <span className="text-base font-bold text-primary leading-tight">
-                        쎄시봉<br />
-                        영업관리시스템
+                        {config.title}<br />
+                        {config.subtitle}
                     </span>
                 </Link>
-                <NotificationBell />
+                {site === "gapyeong" && <NotificationBell />}
             </div>
             <div className="flex-1 overflow-auto py-6">
                 <nav className="grid gap-2 px-4">
@@ -126,7 +154,7 @@ export function Sidebar() {
                     <div className="pr-8">
                         <p className="text-xs font-medium text-muted-foreground">접속 계정</p>
                         <p className="text-sm font-semibold truncate">{email || "로그인 필요"}</p>
-                        <p className="text-xs text-muted-foreground mt-1 capitalize">{userRole === 'admin' ? '관리자' : '직원'}</p>
+                        <p className="text-xs text-muted-foreground mt-1 capitalize">{userRole === 'super_admin' ? '통합 관리자' : userRole === 'admin' ? '관리자' : '직원'}</p>
                     </div>
                     <Button
                         variant="ghost"

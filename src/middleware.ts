@@ -49,13 +49,31 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL('/login', request.url))
     }
 
-    if (user && request.nextUrl.pathname.startsWith('/admin')) {
+    const path = request.nextUrl.pathname
+    const needsAdmin = path.startsWith('/admin')
+    const needsGapyeong = path.startsWith('/gapyeong')
+    const needsYangpyeong = path.startsWith('/yangpyeong')
+
+    if (user && (needsAdmin || needsGapyeong || needsYangpyeong)) {
         const { data: profile } = await supabase
             .from('profiles')
-            .select('role')
+            .select('role, site')
             .eq('id', user.id)
             .single()
-        if (profile?.role !== 'admin') {
+
+        const role = profile?.role
+        const site = profile?.site
+        const isSuper = role === 'super_admin'
+
+        // 계정 관리: 통합 관리자(super_admin) 전용
+        if (needsAdmin && !isSuper) {
+            return NextResponse.redirect(new URL('/', request.url))
+        }
+        // 사이트 접근: super_admin(all) 또는 본인 소속 사이트만
+        if (needsGapyeong && !(isSuper || site === 'all' || site === 'gapyeong')) {
+            return NextResponse.redirect(new URL('/', request.url))
+        }
+        if (needsYangpyeong && !(isSuper || site === 'all' || site === 'yangpyeong')) {
             return NextResponse.redirect(new URL('/', request.url))
         }
     }

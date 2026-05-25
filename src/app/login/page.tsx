@@ -42,9 +42,12 @@ export default function LoginPage() {
         <div className="flex min-h-screen items-center justify-center bg-background p-4">
             <Card className="w-full max-w-md">
                 <CardHeader className="text-center">
-                    <div className="flex justify-center mb-4">
+                    <div className="flex justify-center items-center gap-6 mb-4">
                         <div className="relative h-16 w-16">
-                            <img src="/logo.png" alt="Logo" className="object-contain w-full h-full" />
+                            <img src="/yp-logo.png" alt="양평 로고" className="object-contain w-full h-full" />
+                        </div>
+                        <div className="relative h-16 w-16">
+                            <img src="/logo.png" alt="가평 로고" className="object-contain w-full h-full" />
                         </div>
                     </div>
                     <CardTitle className="text-2xl font-bold text-primary">쎄시봉 영업관리시스템</CardTitle>

@@ -5,7 +5,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 
-async function requireAdmin() {
+async function requireSuperAdmin() {
     const cookieStore = await cookies()
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,14 +31,14 @@ async function requireAdmin() {
         .select('role')
         .eq('id', user.id)
         .single()
-    if (profile?.role !== 'admin') {
-        return { ok: false as const, error: '관리자 권한이 필요합니다.' }
+    if (profile?.role !== 'super_admin') {
+        return { ok: false as const, error: '통합 관리자 권한이 필요합니다.' }
     }
     return { ok: true as const, user }
 }
 
 export async function createUser(prevState: any, formData: FormData) {
-    const auth = await requireAdmin()
+    const auth = await requireSuperAdmin()
     if (!auth.ok) return { error: auth.error }
 
     const email = formData.get('email') as string
@@ -46,6 +46,7 @@ export async function createUser(prevState: any, formData: FormData) {
     const role = formData.get('role') as string || 'employee'
     const name = formData.get('name') as string
     const phone = formData.get('phone') as string
+    const site = (formData.get('site') as string) || (role === 'super_admin' ? 'all' : 'gapyeong')
 
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
         return { error: '서버 설정 오류: SUPABASE_SERVICE_ROLE_KEY가 설정되지 않았습니다. .env.local 파일을 확인해주세요.' }
@@ -78,6 +79,7 @@ export async function createUser(prevState: any, formData: FormData) {
             .from('profiles')
             .update({
                 role: role,
+                site: site,
                 name: name,
                 phone: phone
             })
@@ -89,6 +91,7 @@ export async function createUser(prevState: any, formData: FormData) {
                 id: data.user.id,
                 email: email,
                 role: role,
+                site: site,
                 name: name,
                 phone: phone
             })
@@ -104,7 +107,7 @@ export async function createUser(prevState: any, formData: FormData) {
 }
 
 export async function deleteUser(userId: string) {
-    const auth = await requireAdmin()
+    const auth = await requireSuperAdmin()
     if (!auth.ok) return { error: auth.error }
 
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {

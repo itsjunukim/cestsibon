@@ -8,6 +8,7 @@ import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/co
 import { createClient } from "@/lib/supabase"
 import { useEffect, useState } from "react"
 import { NotificationBell } from "@/components/NotificationBell"
+import { useUserRole } from "@/hooks/useUserRole"
 import {
     LayoutDashboard,
     BedDouble,
@@ -20,17 +21,52 @@ import {
     Calculator
 } from "lucide-react"
 
-export function BottomTabBar() {
+type SiteKey = "gapyeong" | "yangpyeong"
+
+const SITE_MENU: Record<SiteKey, { home: string; logo: string; title: string; subtitle: string; full: { icon: any; label: string; href: string }[]; bottom: { icon: any; label: string; href: string }[] }> = {
+    gapyeong: {
+        home: "/gapyeong",
+        logo: "/logo.png",
+        title: "더 파크 쎄시봉",
+        subtitle: "영업관리시스템",
+        full: [
+            { icon: LayoutDashboard, label: "영업 현황", href: "/gapyeong" },
+            { icon: CalendarDays, label: "예약 관리", href: "/gapyeong/reservations" },
+            { icon: Ticket, label: "이용권 관리", href: "/gapyeong/tickets" },
+            { icon: BedDouble, label: "숙소 관리", href: "/gapyeong/accommodations" },
+            { icon: Calculator, label: "정산 관리", href: "/gapyeong/settlements" },
+        ],
+        bottom: [
+            { icon: LayoutDashboard, label: "영업현황", href: "/gapyeong" },
+            { icon: CalendarDays, label: "예약관리", href: "/gapyeong/reservations" },
+            { icon: Ticket, label: "이용권", href: "/gapyeong/tickets" },
+            { icon: Calculator, label: "정산관리", href: "/gapyeong/settlements" },
+        ],
+    },
+    yangpyeong: {
+        home: "/yangpyeong",
+        logo: "/yp-logo.png",
+        title: "쎄시봉 수상레저",
+        subtitle: "영업관리시스템",
+        full: [
+            { icon: LayoutDashboard, label: "영업 현황", href: "/yangpyeong" },
+            { icon: CreditCard, label: "매출 현황", href: "/yangpyeong/sales" },
+            { icon: Ticket, label: "이용권 관리", href: "/yangpyeong/products" },
+        ],
+        bottom: [
+            { icon: LayoutDashboard, label: "영업현황", href: "/yangpyeong" },
+            { icon: CreditCard, label: "매출현황", href: "/yangpyeong/sales" },
+            { icon: Ticket, label: "이용권", href: "/yangpyeong/products" },
+        ],
+    },
+}
+
+export function BottomTabBar({ site = "gapyeong" }: { site?: SiteKey }) {
     const pathname = usePathname()
 
     if (pathname === '/login' || pathname.startsWith('/auth')) return null
 
-    const tabs = [
-        { icon: LayoutDashboard, label: "영업현황", href: "/" },
-        { icon: CalendarDays, label: "예약관리", href: "/reservations" },
-        { icon: Ticket, label: "이용권", href: "/tickets" },
-        { icon: Calculator, label: "정산관리", href: "/settlements" },
-    ]
+    const tabs = SITE_MENU[site].bottom
 
     return (
         <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-background border-t flex items-stretch">
@@ -54,9 +90,13 @@ export function BottomTabBar() {
     )
 }
 
-export function MobileNav() {
+export function MobileNav({ site = "gapyeong" }: { site?: SiteKey }) {
     const pathname = usePathname()
     const router = useRouter()
+    const config = SITE_MENU[site]
+    const { canAccessSite } = useUserRole()
+    const hasBoth = canAccessSite("gapyeong") && canAccessSite("yangpyeong")
+    const logoHref = hasBoth ? "/" : config.home
     const [open, setOpen] = useState(false)
     const [userRole, setUserRole] = useState<string | null>(null)
     const [email, setEmail] = useState<string>("")
@@ -89,15 +129,9 @@ export function MobileNav() {
         return () => subscription.unsubscribe()
     }, [])
 
-    const sidebarItems = [
-        { icon: LayoutDashboard, label: "영업 현황", href: "/" },
-        { icon: CalendarDays, label: "예약 관리", href: "/reservations" },
-        { icon: Ticket, label: "이용권 관리", href: "/tickets" },
-        { icon: BedDouble, label: "숙소 관리", href: "/accommodations" },
-        { icon: Calculator, label: "정산 관리", href: "/settlements" },
-    ]
+    const sidebarItems = [...config.full]
 
-    if (userRole === 'admin') {
+    if (userRole === 'super_admin') {
         sidebarItems.push({ icon: Users, label: "계정 관리", href: "/admin/users" })
     }
 
@@ -111,17 +145,17 @@ export function MobileNav() {
 
     return (
         <div className="md:hidden flex items-center justify-between p-4 border-b bg-background sticky top-0 z-50">
-            <div className="flex items-center gap-2">
+            <Link href={logoHref} title={hasBoth ? "워크스페이스 선택" : undefined} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
                 <div className="relative h-8 w-8">
-                    <img src="/logo.png" alt="Logo" className="object-contain w-full h-full" />
+                    <img src={config.logo} alt="Logo" className="object-contain w-full h-full" />
                 </div>
                 <span className="font-bold text-sm text-primary leading-tight">
-                    쎄시봉<br />영업관리시스템
+                    {config.title}<br />{config.subtitle}
                 </span>
-            </div>
+            </Link>
 
             <div className="flex items-center gap-1">
-                <NotificationBell />
+                {site === "gapyeong" && <NotificationBell />}
                 <Sheet open={open} onOpenChange={setOpen}>
                     <SheetTrigger asChild>
                         <Button variant="ghost" size="icon">
@@ -133,7 +167,7 @@ export function MobileNav() {
                     <SheetHeader className="p-4 border-b text-left">
                         <SheetTitle className="flex items-center gap-2">
                             <div className="relative h-8 w-8">
-                                <img src="/logo.png" alt="Logo" className="object-contain w-full h-full" />
+                                <img src={config.logo} alt="Logo" className="object-contain w-full h-full" />
                             </div>
                             <span className="font-bold">메뉴</span>
                         </SheetTitle>
