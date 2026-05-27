@@ -20,6 +20,8 @@ interface DailyRow {
     card_amount: number
     cash_amount: number
     transfer_amount: number
+    deposit_transfer_amount: number
+    naver_amount: number
     total_amount: number
     memo: string | null
 }
@@ -32,6 +34,8 @@ interface DraftRow {
     card: string
     cash: string
     transfer: string
+    deposit_transfer: string
+    naver: string
     memo: string
     dirty: boolean
 }
@@ -57,6 +61,7 @@ export default function YangpyeongSalesPage() {
                 .from("yp_daily_sales")
                 .select("*")
                 .order("date", { ascending: false })
+                .order("created_at", { ascending: false })
             if (error) { console.error(error); return [] }
             return (data as DailyRow[]) || []
         },
@@ -74,6 +79,8 @@ export default function YangpyeongSalesPage() {
                 card: String(r.card_amount || 0),
                 cash: String(r.cash_amount || 0),
                 transfer: String(r.transfer_amount || 0),
+                deposit_transfer: String(r.deposit_transfer_amount || 0),
+                naver: String(r.naver_amount || 0),
                 memo: r.memo || "",
                 dirty: false,
             }))
@@ -88,15 +95,12 @@ export default function YangpyeongSalesPage() {
 
     const addRow = () => {
         const today = format(new Date(), "yyyy-MM-dd")
-        // 이미 같은 날짜 행이 있으면 막기 (날짜 고유)
-        setDrafts(prev => [{ _key: randKey(), id: null, date: today, card: "", cash: "", transfer: "", memo: "", dirty: true }, ...prev])
+        // 같은 날짜 여러 행 허용
+        setDrafts(prev => [{ _key: randKey(), id: null, date: today, card: "", cash: "", transfer: "", deposit_transfer: "", naver: "", memo: "", dirty: true }, ...prev])
     }
 
     const saveRow = async (d: DraftRow) => {
         if (!d.date) { alert("날짜를 입력해주세요."); return }
-        // 날짜 중복 검사 (자신 제외)
-        const dup = drafts.find(x => x._key !== d._key && x.date === d.date)
-        if (dup) { alert(`${d.date} 날짜 행이 이미 있습니다. 해당 행을 수정해주세요.`); return }
 
         setSavingKey(d._key)
         const payload = {
@@ -104,6 +108,8 @@ export default function YangpyeongSalesPage() {
             card_amount: num(d.card),
             cash_amount: num(d.cash),
             transfer_amount: num(d.transfer),
+            deposit_transfer_amount: num(d.deposit_transfer),
+            naver_amount: num(d.naver),
             memo: d.memo.trim() || null,
         }
         const { error } = d.id
@@ -130,8 +136,10 @@ export default function YangpyeongSalesPage() {
         card: a.card + Number(r.card_amount || 0),
         cash: a.cash + Number(r.cash_amount || 0),
         transfer: a.transfer + Number(r.transfer_amount || 0),
+        deposit_transfer: a.deposit_transfer + Number(r.deposit_transfer_amount || 0),
+        naver: a.naver + Number(r.naver_amount || 0),
         total: a.total + Number(r.total_amount || 0),
-    }), { card: 0, cash: 0, transfer: 0, total: 0 })
+    }), { card: 0, cash: 0, transfer: 0, deposit_transfer: 0, naver: 0, total: 0 })
 
     return (
         <div className="space-y-6">
@@ -141,7 +149,7 @@ export default function YangpyeongSalesPage() {
                         <CreditCard className="h-7 w-7 text-cyan-500" />
                         매출 현황
                     </h1>
-                    <p className="text-sm text-slate-500 mt-1">일자별 카드·현금·계좌이체 매출을 입력합니다. 총매출은 자동 합산됩니다.</p>
+                    <p className="text-sm text-slate-500 mt-1">일자별 결제 수단별 매출을 입력합니다. 총매출은 자동 합산됩니다.</p>
                 </div>
                 <Button onClick={addRow} disabled={!isAdmin} className="bg-cyan-600 hover:bg-cyan-700 text-white">
                     <Plus className="h-4 w-4 mr-1.5" />
@@ -150,11 +158,13 @@ export default function YangpyeongSalesPage() {
             </div>
 
             {/* 합계 카드 */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                 <Stat label="총 매출" value={fmtMoney(grand.total)} tone="indigo" />
                 <Stat label="카드" value={fmtMoney(grand.card)} tone="violet" />
                 <Stat label="현금" value={fmtMoney(grand.cash)} tone="emerald" />
-                <Stat label="계좌이체" value={fmtMoney(grand.transfer)} tone="cyan" />
+                <Stat label="이체" value={fmtMoney(grand.transfer)} tone="cyan" />
+                <Stat label="예약금(이체)" value={fmtMoney(grand.deposit_transfer)} tone="amber" />
+                <Stat label="네이버" value={fmtMoney(grand.naver)} tone="rose" />
             </div>
 
             <Card className="border border-slate-200 rounded-xl shadow-sm">
@@ -167,23 +177,25 @@ export default function YangpyeongSalesPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="w-[150px]">날짜</TableHead>
-                                    <TableHead className="text-right w-[140px]">총매출</TableHead>
-                                    <TableHead className="text-right w-[130px]">카드</TableHead>
-                                    <TableHead className="text-right w-[130px]">현금</TableHead>
-                                    <TableHead className="text-right w-[130px]">계좌이체</TableHead>
-                                    <TableHead>메모</TableHead>
-                                    <TableHead className="text-right w-[100px]">관리</TableHead>
+                                    <TableHead className="text-center w-[130px]">날짜</TableHead>
+                                    <TableHead className="text-center w-[140px]">총매출</TableHead>
+                                    <TableHead className="text-center w-[120px]">카드</TableHead>
+                                    <TableHead className="text-center w-[120px]">현금</TableHead>
+                                    <TableHead className="text-center w-[120px]">이체</TableHead>
+                                    <TableHead className="text-center w-[120px]">예약금(이체)</TableHead>
+                                    <TableHead className="text-center w-[120px]">네이버</TableHead>
+                                    <TableHead className="text-center w-[300px]">메모</TableHead>
+                                    <TableHead className="text-center w-[80px]">관리</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {isLoading ? (
-                                    <TableRow><TableCell colSpan={7} className="text-center py-8 text-sm text-slate-400">불러오는 중...</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={9} className="text-center py-8 text-sm text-slate-400">불러오는 중...</TableCell></TableRow>
                                 ) : drafts.length === 0 ? (
-                                    <TableRow><TableCell colSpan={7} className="text-center py-8 text-sm text-slate-400">매출 데이터가 없습니다. "행 추가"로 입력하세요.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={9} className="text-center py-8 text-sm text-slate-400">매출 데이터가 없습니다. "행 추가"로 입력하세요.</TableCell></TableRow>
                                 ) : (
                                     drafts.map(d => {
-                                        const rowTotal = num(d.card) + num(d.cash) + num(d.transfer)
+                                        const rowTotal = num(d.card) + num(d.cash) + num(d.transfer) + num(d.deposit_transfer) + num(d.naver)
                                         return (
                                             <TableRow key={d._key} className={cn(d.dirty && "bg-amber-50/40")}>
                                                 <TableCell>
@@ -209,23 +221,44 @@ export default function YangpyeongSalesPage() {
                                                         onChange={(e) => patch(d._key, { transfer: e.target.value.replace(/[^0-9]/g, "") })}
                                                         className="h-9 text-right tabular-nums" placeholder="0" />
                                                 </TableCell>
-                                                <TableCell className="min-w-[200px] align-top">
-                                                    <Textarea readOnly={!isAdmin} value={d.memo}
-                                                        rows={1}
-                                                        onChange={(e) => patch(d._key, { memo: e.target.value })}
-                                                        className="resize-none transition-all duration-150 h-9 min-h-9 py-1.5 leading-6 overflow-hidden whitespace-nowrap text-ellipsis focus:h-24 focus:min-h-24 focus:whitespace-pre-wrap focus:overflow-auto"
-                                                        placeholder="내용 메모" />
+                                                <TableCell>
+                                                    <Input inputMode="numeric" disabled={!isAdmin} value={comma(d.deposit_transfer)}
+                                                        onChange={(e) => patch(d._key, { deposit_transfer: e.target.value.replace(/[^0-9]/g, "") })}
+                                                        className="h-9 text-right tabular-nums" placeholder="0" />
                                                 </TableCell>
-                                                <TableCell className="text-right whitespace-nowrap">
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-cyan-600 hover:bg-cyan-50 disabled:text-slate-300"
-                                                        title="저장" disabled={!isAdmin || !d.dirty || savingKey === d._key}
-                                                        onClick={() => saveRow(d)}>
-                                                        <Save className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500 hover:bg-rose-50"
-                                                        title="삭제" disabled={!isAdmin} onClick={() => deleteRow(d)}>
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
+                                                <TableCell>
+                                                    <Input inputMode="numeric" disabled={!isAdmin} value={comma(d.naver)}
+                                                        onChange={(e) => patch(d._key, { naver: e.target.value.replace(/[^0-9]/g, "") })}
+                                                        className="h-9 text-right tabular-nums" placeholder="0" />
+                                                </TableCell>
+                                                <TableCell className="align-top group/memo">
+                                                    <div className="relative">
+                                                        <Textarea readOnly={!isAdmin} value={d.memo}
+                                                            rows={1}
+                                                            onChange={(e) => patch(d._key, { memo: e.target.value })}
+                                                            className={cn(
+                                                                "resize-none transition-all duration-150 h-9 min-h-9 w-full py-1.5 leading-6 overflow-hidden whitespace-nowrap text-ellipsis",
+                                                                "focus:h-24 focus:min-h-24 focus:whitespace-pre-wrap focus:overflow-auto",
+                                                                d.memo && "group-hover/memo:h-24 group-hover/memo:min-h-24 group-hover/memo:whitespace-pre-wrap group-hover/memo:overflow-auto"
+                                                            )}
+                                                            placeholder="메모 입력" />
+                                                        {d.memo.includes('\n') && (
+                                                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-sm font-bold group-hover/memo:hidden group-focus-within/memo:hidden">⋯</span>
+                                                        )}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="px-1">
+                                                    <div className="flex items-center justify-center gap-0.5">
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-cyan-600 hover:bg-cyan-50 disabled:text-slate-300"
+                                                            title="저장" disabled={!isAdmin || !d.dirty || savingKey === d._key}
+                                                            onClick={() => saveRow(d)}>
+                                                            <Save className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500 hover:bg-rose-50"
+                                                            title="삭제" disabled={!isAdmin} onClick={() => deleteRow(d)}>
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
                                                 </TableCell>
                                             </TableRow>
                                         )
@@ -243,7 +276,7 @@ export default function YangpyeongSalesPage() {
                             <div className="py-8 text-center text-sm text-slate-400">매출 데이터가 없습니다. "행 추가"로 입력하세요.</div>
                         ) : (
                             drafts.map(d => {
-                                const rowTotal = num(d.card) + num(d.cash) + num(d.transfer)
+                                const rowTotal = num(d.card) + num(d.cash) + num(d.transfer) + num(d.deposit_transfer) + num(d.naver)
                                 return (
                                     <div key={d._key} className={cn("rounded-xl border p-4 space-y-3", d.dirty ? "border-amber-300 bg-amber-50/40" : "border-slate-200 bg-white")}>
                                         {/* 날짜 + 총매출 + 액션 */}
@@ -284,9 +317,21 @@ export default function YangpyeongSalesPage() {
                                                     className="h-9 text-right tabular-nums" placeholder="0" />
                                             </div>
                                             <div>
-                                                <label className="text-[11px] font-semibold text-slate-500 block mb-1">계좌이체</label>
+                                                <label className="text-[11px] font-semibold text-slate-500 block mb-1">이체</label>
                                                 <Input inputMode="numeric" disabled={!isAdmin} value={comma(d.transfer)}
                                                     onChange={(e) => patch(d._key, { transfer: e.target.value.replace(/[^0-9]/g, "") })}
+                                                    className="h-9 text-right tabular-nums" placeholder="0" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[11px] font-semibold text-slate-500 block mb-1">예약금(이체)</label>
+                                                <Input inputMode="numeric" disabled={!isAdmin} value={comma(d.deposit_transfer)}
+                                                    onChange={(e) => patch(d._key, { deposit_transfer: e.target.value.replace(/[^0-9]/g, "") })}
+                                                    className="h-9 text-right tabular-nums" placeholder="0" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[11px] font-semibold text-slate-500 block mb-1">네이버</label>
+                                                <Input inputMode="numeric" disabled={!isAdmin} value={comma(d.naver)}
+                                                    onChange={(e) => patch(d._key, { naver: e.target.value.replace(/[^0-9]/g, "") })}
                                                     className="h-9 text-right tabular-nums" placeholder="0" />
                                             </div>
                                         </div>
@@ -297,7 +342,7 @@ export default function YangpyeongSalesPage() {
                                                 rows={2}
                                                 onChange={(e) => patch(d._key, { memo: e.target.value })}
                                                 className="resize-none min-h-[60px]"
-                                                placeholder="내용 메모" />
+                                                placeholder="메모 입력" />
                                         </div>
                                     </div>
                                 )
@@ -316,12 +361,14 @@ export default function YangpyeongSalesPage() {
     )
 }
 
-function Stat({ label, value, tone }: { label: string; value: string; tone: "indigo" | "violet" | "emerald" | "cyan" }) {
+function Stat({ label, value, tone }: { label: string; value: string; tone: "indigo" | "violet" | "emerald" | "cyan" | "amber" | "rose" }) {
     const map = {
         indigo: "border-indigo-200 bg-indigo-50/60 text-indigo-700",
         violet: "border-violet-200 bg-violet-50/60 text-violet-700",
         emerald: "border-emerald-200 bg-emerald-50/60 text-emerald-700",
         cyan: "border-cyan-200 bg-cyan-50/60 text-cyan-700",
+        amber: "border-amber-200 bg-amber-50/60 text-amber-700",
+        rose: "border-rose-200 bg-rose-50/60 text-rose-700",
     }
     return (
         <div className={cn("flex flex-col px-4 py-3 rounded-lg border", map[tone])}>

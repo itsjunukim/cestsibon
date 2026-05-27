@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1779634562422,
+  "lastScanned": 1779883099363,
   "projectRoot": "/Users/junukim/repo/cestsibon",
   "techStack": {
     "languages": [
@@ -78,7 +78,7 @@
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 8,
-      "lastAccessed": 1779634562406,
+      "lastAccessed": 1779883099350,
       "keyFiles": [
         "ADMIN_GUIDE.md",
         "ADMIN_TASK_PLAN.md",
@@ -90,8 +90,8 @@
     "public": {
       "path": "public",
       "purpose": "Public files",
-      "fileCount": 6,
-      "lastAccessed": 1779634562406,
+      "fileCount": 7,
+      "lastAccessed": 1779883099351,
       "keyFiles": [
         "file.svg",
         "globe.svg",
@@ -100,11 +100,24 @@
         "vercel.svg"
       ]
     },
+    "sql": {
+      "path": "sql",
+      "purpose": null,
+      "fileCount": 30,
+      "lastAccessed": 1779883099352,
+      "keyFiles": [
+        "README.md",
+        "add_balance_payments.sql",
+        "add_monthly_settlements.sql",
+        "add_profile_columns.sql",
+        "add_rooms_table.sql"
+      ]
+    },
     "src": {
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1779634562409,
+      "lastAccessed": 1779883099353,
       "keyFiles": [
         "middleware.ts"
       ]
@@ -113,7 +126,7 @@
       "path": "supabase",
       "purpose": null,
       "fileCount": 2,
-      "lastAccessed": 1779634562411,
+      "lastAccessed": 1779883099353,
       "keyFiles": [
         "config.toml"
       ]
@@ -122,7 +135,7 @@
       "path": "src/app",
       "purpose": "Application code",
       "fileCount": 5,
-      "lastAccessed": 1779634562411,
+      "lastAccessed": 1779883099353,
       "keyFiles": [
         "favicon.ico",
         "globals.css",
@@ -133,7 +146,7 @@
       "path": "src/components",
       "purpose": "UI components",
       "fileCount": 15,
-      "lastAccessed": 1779634562411,
+      "lastAccessed": 1779883099353,
       "keyFiles": [
         "AccommodationForm.tsx",
         "DateRangePicker.tsx",
@@ -144,7 +157,7 @@
       "path": "src/lib",
       "purpose": "Library code",
       "fileCount": 2,
-      "lastAccessed": 1779634562412,
+      "lastAccessed": 1779883099354,
       "keyFiles": [
         "supabase.ts",
         "utils.ts"

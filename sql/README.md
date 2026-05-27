@@ -65,7 +65,9 @@
 | `yp_simplify_v3.sql` | v3 단순화 — 가평 tickets 와 동일 스키마로 정리. yp_products 의 category·is_active 제거, yp_sale_items 의 is_coupon_use 제거, yp_coupon_balance 뷰 폐기 |
 | `yp_add_split_payments_v4.sql` | v4 — yp_sales 에 payments JSONB 배열 추가. 한 매출을 여러 결제 수단으로 나눠 수금하는 경우 표현 (가평 balance_payments 패턴) |
 | `yp_total_editable_v5.sql` | v5 — yp_sales.total_amount 자동 갱신 트리거 제거. 현장 할인 등 라인 합계와 다른 총액을 클라이언트가 명시적으로 저장하도록 변경 |
-| `yp_daily_sales_v6.sql` | **v6 (현행)** — 이용권/아이템 모델(yp_products·yp_sales·yp_sale_items) 전부 폐기하고 일별 집계 테이블 yp_daily_sales(날짜·카드·현금·계좌이체·합계·메모)로 전면 재설계. v1~v5 는 모두 이 파일로 대체됨 |
+| `yp_daily_sales_v6.sql` | v6 — 이용권/아이템 모델(yp_products·yp_sales·yp_sale_items) 전부 폐기하고 일별 집계 테이블 yp_daily_sales(날짜·카드·현금·계좌이체·합계·메모)로 전면 재설계. v1~v5 는 모두 이 파일로 대체됨 |
+| `yp_daily_sales_allow_dup_v7.sql` | v7 — yp_daily_sales.date 의 UNIQUE 제약 제거. 같은 날짜에 여러 매출 행 입력 허용 (오전/오후 등 분리 기록) |
+| `yp_daily_sales_add_methods_v8.sql` | **v8 (현행)** — 결제 수단 추가: 예약금(이체)·네이버. total_amount = 카드+현금+이체+예약금(이체)+네이버 |
 
 ---
 
