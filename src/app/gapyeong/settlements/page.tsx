@@ -309,10 +309,13 @@ export default function SettlementsPage() {
         date: string,
         reservations: { id: string; name: string }[],
         amount: number,
-        isPaid: boolean,
+        isPaidRaw: boolean,
         paidDate: string | null,
         accommodationName?: string,
-    ) => (
+    ) => {
+        // 정산 금액 0원은 정산 대상이 아니므로 항상 미체크로 표시
+        const isPaid = amount > 0 ? isPaidRaw : false
+        return (
         <TableRow key={rowKey} className={isPaid ? "bg-slate-50/50" : "hover:bg-muted/30"}>
             <TableCell className="font-medium text-center">
                 {format(new Date(date), "MM.dd")}
@@ -390,7 +393,8 @@ export default function SettlementsPage() {
                 )}
             </TableCell>
         </TableRow>
-    )
+        )
+    }
 
     const renderAccordionContent = (accData: AggregatedData, category: 'accommodation' | 'other') => {
         // Filter dates that have actual amount for this category
