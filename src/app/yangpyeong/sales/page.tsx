@@ -4,14 +4,14 @@ import { useState, useEffect, useRef } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase"
 import { useUserRole } from "@/hooks/useUserRole"
-import { format } from "date-fns"
+import { format, startOfMonth, endOfMonth, subMonths, addMonths } from "date-fns"
 import { ko } from "date-fns/locale"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Trash2, CreditCard, Save } from "lucide-react"
+import { Plus, Trash2, CreditCard, Save, ChevronLeft, ChevronRight, Check } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface DailyRow {
@@ -52,14 +52,21 @@ export default function YangpyeongSalesPage() {
     const queryClient = useQueryClient()
     const [drafts, setDrafts] = useState<DraftRow[]>([])
     const [savingKey, setSavingKey] = useState<string | null>(null)
+    const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set())
     const seededRef = useRef(false)
+    const [currentMonth, setCurrentMonth] = useState<Date>(new Date())
+
+    const monthStart = format(startOfMonth(currentMonth), "yyyy-MM-dd")
+    const monthEnd = format(endOfMonth(currentMonth), "yyyy-MM-dd")
 
     const { data: rows, isLoading } = useQuery<DailyRow[]>({
-        queryKey: ["yp-daily-sales"],
+        queryKey: ["yp-daily-sales", monthStart, monthEnd],
         queryFn: async () => {
             const { data, error } = await supabase
                 .from("yp_daily_sales")
                 .select("*")
+                .gte("date", monthStart)
+                .lte("date", monthEnd)
                 .order("date", { ascending: false })
                 .order("created_at", { ascending: false })
             if (error) { console.error(error); return [] }
@@ -67,24 +74,36 @@ export default function YangpyeongSalesPage() {
         },
     })
 
-    // 서버 데이터 → draft 동기화 (저장 안 된 신규행은 유지)
+    // 서버 데이터 → draft 동기화
+    //   - 미저장 신규행(id=null)은 유지
+    //   - 이미 화면에 있는 행은 _key/dirty 보존 (인플레이스 갱신 방지)
+    //   - 서버에만 있는 신규 행은 추가
     useEffect(() => {
         if (!rows) return
         setDrafts(prev => {
-            const newRows = prev.filter(d => d.id === null) // 미저장 신규행 보존
-            const serverRows: DraftRow[] = rows.map(r => ({
-                _key: r.id,
-                id: r.id,
-                date: r.date,
-                card: String(r.card_amount || 0),
-                cash: String(r.cash_amount || 0),
-                transfer: String(r.transfer_amount || 0),
-                deposit_transfer: String(r.deposit_transfer_amount || 0),
-                naver: String(r.naver_amount || 0),
-                memo: r.memo || "",
-                dirty: false,
-            }))
-            return [...newRows, ...serverRows]
+            const unsavedDrafts = prev.filter(d => d.id === null) // 미저장 신규행
+            const existingById = new Map(prev.filter(d => d.id !== null).map(d => [d.id as string, d]))
+
+            const serverRows: DraftRow[] = rows.map(r => {
+                const existing = existingById.get(r.id)
+                if (existing && existing.dirty) {
+                    // 사용자가 편집 중이면 서버 값으로 덮어쓰지 않음
+                    return existing
+                }
+                return {
+                    _key: existing?._key ?? r.id, // _key 보존 → 펄스 유지
+                    id: r.id,
+                    date: r.date,
+                    card: String(r.card_amount || 0),
+                    cash: String(r.cash_amount || 0),
+                    transfer: String(r.transfer_amount || 0),
+                    deposit_transfer: String(r.deposit_transfer_amount || 0),
+                    naver: String(r.naver_amount || 0),
+                    memo: r.memo || "",
+                    dirty: false,
+                }
+            })
+            return [...unsavedDrafts, ...serverRows]
         })
         seededRef.current = true
     }, [rows])
@@ -94,7 +113,10 @@ export default function YangpyeongSalesPage() {
     }
 
     const addRow = () => {
-        const today = format(new Date(), "yyyy-MM-dd")
+        // 현재 보고 있는 월이 이번 달이면 오늘 날짜, 아니면 그 달 1일을 기본값으로
+        const now = new Date()
+        const sameMonth = now.getFullYear() === currentMonth.getFullYear() && now.getMonth() === currentMonth.getMonth()
+        const today = sameMonth ? format(now, "yyyy-MM-dd") : monthStart
         // 같은 날짜 여러 행 허용
         setDrafts(prev => [{ _key: randKey(), id: null, date: today, card: "", cash: "", transfer: "", deposit_transfer: "", naver: "", memo: "", dirty: true }, ...prev])
     }
@@ -112,11 +134,33 @@ export default function YangpyeongSalesPage() {
             naver_amount: num(d.naver),
             memo: d.memo.trim() || null,
         }
-        const { error } = d.id
-            ? await supabase.from("yp_daily_sales").update(payload).eq("id", d.id)
-            : await supabase.from("yp_daily_sales").insert(payload)
-        setSavingKey(null)
-        if (error) { alert("저장 실패: " + error.message); return }
+        let newId: string | null = d.id
+        if (d.id) {
+            const { error } = await supabase.from("yp_daily_sales").update(payload).eq("id", d.id)
+            setSavingKey(null)
+            if (error) { alert("저장 실패: " + error.message); return }
+        } else {
+            // 신규 insert → 새 id를 받아 같은 행에 그대로 부여 (재마운트 없음 → 펄스 보임)
+            const { data, error } = await supabase.from("yp_daily_sales").insert(payload).select("id").single()
+            setSavingKey(null)
+            if (error) { alert("저장 실패: " + error.message); return }
+            newId = (data as any)?.id || null
+        }
+
+        // 같은 _key 유지하면서 id 채우고 dirty 해제 (재마운트 없이 인플레이스 갱신)
+        setDrafts(prev => prev.map(x => x._key === d._key ? { ...x, id: newId, dirty: false } : x))
+
+        // "방금 저장됨" 펄스 1.8초
+        setSavedKeys(prev => new Set(prev).add(d._key))
+        setTimeout(() => {
+            setSavedKeys(prev => {
+                const next = new Set(prev)
+                next.delete(d._key)
+                return next
+            })
+        }, 1800)
+
+        // 캐시 무효화는 다른 탭/세션 동기화용 (현재 행은 위에서 이미 in-place 갱신됨)
         queryClient.invalidateQueries({ queryKey: ["yp-daily-sales"] })
     }
 
@@ -151,10 +195,26 @@ export default function YangpyeongSalesPage() {
                     </h1>
                     <p className="text-sm text-slate-500 mt-1">일자별 결제 수단별 매출을 입력합니다. 총매출은 자동 합산됩니다.</p>
                 </div>
-                <Button onClick={addRow} disabled={!isAdmin} className="bg-cyan-600 hover:bg-cyan-700 text-white">
-                    <Plus className="h-4 w-4 mr-1.5" />
-                    행 추가
-                </Button>
+                <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 bg-card px-2 py-1 rounded-lg border shadow-sm">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentMonth(prev => subMonths(prev, 1))} title="이전 달">
+                            <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <span className="text-sm font-semibold min-w-[100px] text-center tabular-nums">
+                            {format(currentMonth, "yyyy년 MM월")}
+                        </span>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentMonth(prev => addMonths(prev, 1))} title="다음 달">
+                            <ChevronRight className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setCurrentMonth(new Date())} title="이번 달로 이동">
+                            이번 달
+                        </Button>
+                    </div>
+                    <Button onClick={addRow} disabled={!isAdmin} className="bg-cyan-600 hover:bg-cyan-700 text-white">
+                        <Plus className="h-4 w-4 mr-1.5" />
+                        행 추가
+                    </Button>
+                </div>
             </div>
 
             {/* 합계 카드 */}
@@ -197,7 +257,11 @@ export default function YangpyeongSalesPage() {
                                     drafts.map(d => {
                                         const rowTotal = num(d.card) + num(d.cash) + num(d.transfer) + num(d.deposit_transfer) + num(d.naver)
                                         return (
-                                            <TableRow key={d._key} className={cn(d.dirty && "bg-amber-50/40")}>
+                                            <TableRow key={d._key} className={cn(
+                                                "transition-colors duration-700",
+                                                d.dirty && "bg-amber-50/60",
+                                                savedKeys.has(d._key) && "bg-emerald-50"
+                                            )}>
                                                 <TableCell>
                                                     <Input type="date" value={d.date} disabled={!isAdmin}
                                                         onChange={(e) => patch(d._key, { date: e.target.value })}
@@ -249,11 +313,21 @@ export default function YangpyeongSalesPage() {
                                                 </TableCell>
                                                 <TableCell className="px-1">
                                                     <div className="flex items-center justify-center gap-0.5">
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-cyan-600 hover:bg-cyan-50 disabled:text-slate-300"
-                                                            title="저장" disabled={!isAdmin || !d.dirty || savingKey === d._key}
-                                                            onClick={() => saveRow(d)}>
-                                                            <Save className="h-4 w-4" />
-                                                        </Button>
+                                                        {savedKeys.has(d._key) ? (
+                                                            <span className="inline-flex items-center justify-center h-8 w-8 text-emerald-600" title="저장됨">
+                                                                <Check className="h-4 w-4" />
+                                                            </span>
+                                                        ) : (
+                                                            <Button variant="ghost" size="icon" className={cn(
+                                                                "h-8 w-8 disabled:text-slate-300",
+                                                                d.dirty ? "text-cyan-600 hover:bg-cyan-50" : "text-slate-300"
+                                                            )}
+                                                                title={d.dirty ? "저장" : "변경 없음"}
+                                                                disabled={!isAdmin || !d.dirty || savingKey === d._key}
+                                                                onClick={() => saveRow(d)}>
+                                                                <Save className="h-4 w-4" />
+                                                            </Button>
+                                                        )}
                                                         <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500 hover:bg-rose-50"
                                                             title="삭제" disabled={!isAdmin} onClick={() => deleteRow(d)}>
                                                             <Trash2 className="h-4 w-4" />
@@ -278,18 +352,33 @@ export default function YangpyeongSalesPage() {
                             drafts.map(d => {
                                 const rowTotal = num(d.card) + num(d.cash) + num(d.transfer) + num(d.deposit_transfer) + num(d.naver)
                                 return (
-                                    <div key={d._key} className={cn("rounded-xl border p-4 space-y-3", d.dirty ? "border-amber-300 bg-amber-50/40" : "border-slate-200 bg-white")}>
+                                    <div key={d._key} className={cn(
+                                        "rounded-xl border p-4 space-y-3 transition-colors duration-700",
+                                        d.dirty ? "border-amber-300 bg-amber-50/60" :
+                                        savedKeys.has(d._key) ? "border-emerald-300 bg-emerald-50" :
+                                        "border-slate-200 bg-white"
+                                    )}>
                                         {/* 날짜 + 총매출 + 액션 */}
                                         <div className="flex items-center justify-between gap-2">
                                             <Input type="date" value={d.date} disabled={!isAdmin}
                                                 onChange={(e) => patch(d._key, { date: e.target.value })}
                                                 className="h-9 w-[150px]" />
-                                            <div className="flex items-center gap-1">
-                                                <Button variant="ghost" size="icon" className="h-9 w-9 text-cyan-600 hover:bg-cyan-50 disabled:text-slate-300"
-                                                    title="저장" disabled={!isAdmin || !d.dirty || savingKey === d._key}
-                                                    onClick={() => saveRow(d)}>
-                                                    <Save className="h-4 w-4" />
-                                                </Button>
+                                            <div className="flex items-center gap-0.5">
+                                                {savedKeys.has(d._key) ? (
+                                                    <span className="inline-flex items-center justify-center h-9 w-9 text-emerald-600" title="저장됨">
+                                                        <Check className="h-5 w-5" />
+                                                    </span>
+                                                ) : (
+                                                    <Button variant="ghost" size="icon" className={cn(
+                                                        "h-9 w-9 disabled:text-slate-300",
+                                                        d.dirty ? "text-cyan-600 hover:bg-cyan-50" : "text-slate-300"
+                                                    )}
+                                                        title={d.dirty ? "저장" : "변경 없음"}
+                                                        disabled={!isAdmin || !d.dirty || savingKey === d._key}
+                                                        onClick={() => saveRow(d)}>
+                                                        <Save className="h-4 w-4" />
+                                                    </Button>
+                                                )}
                                                 <Button variant="ghost" size="icon" className="h-9 w-9 text-rose-500 hover:bg-rose-50"
                                                     title="삭제" disabled={!isAdmin} onClick={() => deleteRow(d)}>
                                                     <Trash2 className="h-4 w-4" />
@@ -350,11 +439,6 @@ export default function YangpyeongSalesPage() {
                         )}
                     </div>
 
-                    {drafts.some(d => d.dirty) && (
-                        <p className="text-xs text-amber-600 font-semibold mt-3">
-                            * 노란색 행은 저장되지 않은 변경입니다. 각 행의 저장(💾) 버튼을 눌러주세요.
-                        </p>
-                    )}
                 </CardContent>
             </Card>
         </div>

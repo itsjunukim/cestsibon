@@ -59,6 +59,7 @@ const formSchema = z.object({
     // 숙소 정산 금액
     settlement_accommodation: z.string().optional(),
     settlement_meat: z.string().optional(),
+    settlement_jetboat: z.string().optional(),
     settlement_other: z.string().optional(),
     settlement_other_memo: z.string().optional(),
 })
@@ -170,6 +171,7 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
             pickup_time: initialData?.pickup_time || "",
             settlement_accommodation: "",
             settlement_meat: "",
+            settlement_jetboat: "",
             settlement_other: "",
             settlement_other_memo: "",
         },
@@ -214,6 +216,8 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                     form.setValue('settlement_accommodation', amount);
                 } else if (s.category === 'meat') {
                     form.setValue('settlement_meat', amount);
+                } else if (s.category === 'jetboat') {
+                    form.setValue('settlement_jetboat', amount);
                 } else if (s.category === 'other') {
                     form.setValue('settlement_other', amount);
                     form.setValue('settlement_other_memo', s.memo || "");
@@ -230,7 +234,7 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
     async function onSubmit(values: z.infer<typeof formSchema>) {
         setIsLoading(true)
         try {
-            const { selected_tickets, selected_rooms, settlement_accommodation, settlement_meat, settlement_other, settlement_other_memo, ...reservationData } = values;
+            const { selected_tickets, selected_rooms, settlement_accommodation, settlement_meat, settlement_jetboat, settlement_other, settlement_other_memo, ...reservationData } = values;
 
             const formattedValues = {
                 ...reservationData,
@@ -318,6 +322,7 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                 const settlementInserts = [];
                 const settAccAmount = Number(String(settlement_accommodation || "0").replace(/[^0-9]/g, ''));
                 const settMeatAmount = Number(String(settlement_meat || "0").replace(/[^0-9]/g, ''));
+                const settJetboatAmount = Number(String(settlement_jetboat || "0").replace(/[^0-9]/g, ''));
                 const settOtherAmount = Number(String(settlement_other || "0").replace(/[^0-9]/g, ''));
 
                 if (settAccAmount > 0) {
@@ -334,6 +339,14 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                         accommodation_id: accommodationId || null,
                         category: 'meat',
                         amount: settMeatAmount,
+                    });
+                }
+                if (settJetboatAmount > 0) {
+                    settlementInserts.push({
+                        reservation_id: currentReservationId,
+                        accommodation_id: accommodationId || null,
+                        category: 'jetboat',
+                        amount: settJetboatAmount,
                     });
                 }
                 if (settOtherAmount > 0) {
@@ -1183,8 +1196,8 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                     </div>
                 </div>
 
-                {/* 숙소 정산 금액 섹션 - 숙박 예약인 경우만 노출 */}
-                {form.watch("reservation_type") === "accommodation" && (
+                {/* 정산 금액 섹션 - 숙박/당일 모두 노출 */}
+                {(form.watch("reservation_type") === "accommodation" || form.watch("reservation_type") === "day") && (
                 <div className="w-full bg-white border border-indigo-200 shadow-sm shadow-indigo-100/50 rounded-2xl p-6 flex flex-col relative overflow-hidden">
                     <div className="absolute top-0 left-0 w-full h-1 bg-indigo-500"></div>
                     <div className="flex justify-between items-end border-b border-indigo-100 pb-3 mb-5 mt-1">
@@ -1192,7 +1205,7 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                         <span className="text-xs text-indigo-500 font-medium">숙소에 정산할 금액을 입력하세요</span>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         {/* 숙소 정산 */}
                         <FormField
                             control={form.control}
@@ -1221,6 +1234,27 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel className="font-bold text-slate-700 text-sm">고기</FormLabel>
+                                    <FormControl>
+                                        <div className="relative flex items-center">
+                                            <Input type="text" placeholder="0" className="bg-white pr-8 text-right font-bold" {...field} onChange={(e) => {
+                                                const raw = e.target.value.replace(/[^0-9]/g, "");
+                                                field.onChange(raw ? Number(raw).toLocaleString() : "");
+                                            }} value={field.value ? Number(String(field.value).replace(/[^0-9]/g, "")).toLocaleString() : ""} />
+                                            <span className="absolute right-3 text-sm text-slate-500 font-bold pointer-events-none">원</span>
+                                        </div>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        {/* 제트보트 정산 */}
+                        <FormField
+                            control={form.control}
+                            name="settlement_jetboat"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="font-bold text-slate-700 text-sm">제트보트</FormLabel>
                                     <FormControl>
                                         <div className="relative flex items-center">
                                             <Input type="text" placeholder="0" className="bg-white pr-8 text-right font-bold" {...field} onChange={(e) => {
@@ -1283,8 +1317,9 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                             {(() => {
                                 const a = Number(String(form.watch("settlement_accommodation") || "0").replace(/[^0-9]/g, ''));
                                 const m = Number(String(form.watch("settlement_meat") || "0").replace(/[^0-9]/g, ''));
+                                const j = Number(String(form.watch("settlement_jetboat") || "0").replace(/[^0-9]/g, ''));
                                 const o = Number(String(form.watch("settlement_other") || "0").replace(/[^0-9]/g, ''));
-                                return (a + m + o).toLocaleString();
+                                return (a + m + j + o).toLocaleString();
                             })()}
                             <span className="text-sm ml-1">원</span>
                         </span>

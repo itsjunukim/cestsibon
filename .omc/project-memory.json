@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1779883099363,
+  "lastScanned": 1780755441315,
   "projectRoot": "/Users/junukim/repo/cestsibon",
   "techStack": {
     "languages": [
@@ -78,7 +78,7 @@
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 8,
-      "lastAccessed": 1779883099350,
+      "lastAccessed": 1780755441285,
       "keyFiles": [
         "ADMIN_GUIDE.md",
         "ADMIN_TASK_PLAN.md",
@@ -91,7 +91,7 @@
       "path": "public",
       "purpose": "Public files",
       "fileCount": 7,
-      "lastAccessed": 1779883099351,
+      "lastAccessed": 1780755441286,
       "keyFiles": [
         "file.svg",
         "globe.svg",
@@ -103,8 +103,8 @@
     "sql": {
       "path": "sql",
       "purpose": null,
-      "fileCount": 30,
-      "lastAccessed": 1779883099352,
+      "fileCount": 32,
+      "lastAccessed": 1780755441299,
       "keyFiles": [
         "README.md",
         "add_balance_payments.sql",
@@ -117,7 +117,7 @@
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1779883099353,
+      "lastAccessed": 1780755441300,
       "keyFiles": [
         "middleware.ts"
       ]
@@ -126,7 +126,7 @@
       "path": "supabase",
       "purpose": null,
       "fileCount": 2,
-      "lastAccessed": 1779883099353,
+      "lastAccessed": 1780755441300,
       "keyFiles": [
         "config.toml"
       ]
@@ -135,7 +135,7 @@
       "path": "src/app",
       "purpose": "Application code",
       "fileCount": 5,
-      "lastAccessed": 1779883099353,
+      "lastAccessed": 1780755441301,
       "keyFiles": [
         "favicon.ico",
         "globals.css",
@@ -146,7 +146,7 @@
       "path": "src/components",
       "purpose": "UI components",
       "fileCount": 15,
-      "lastAccessed": 1779883099353,
+      "lastAccessed": 1780755441303,
       "keyFiles": [
         "AccommodationForm.tsx",
         "DateRangePicker.tsx",
@@ -157,7 +157,7 @@
       "path": "src/lib",
       "purpose": "Library code",
       "fileCount": 2,
-      "lastAccessed": 1779883099354,
+      "lastAccessed": 1780755441303,
       "keyFiles": [
         "supabase.ts",
         "utils.ts"
@@ -167,8 +167,8 @@
   "hotPaths": [
     {
       "path": "src/components/ReservationForm.tsx",
-      "accessCount": 98,
-      "lastAccessed": 1779679083321,
+      "accessCount": 111,
+      "lastAccessed": 1780756470415,
       "type": "file"
     },
     {

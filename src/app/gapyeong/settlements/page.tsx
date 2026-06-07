@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
-import { ChevronLeft, ChevronRight, Calculator, Home, CalendarIcon, Beef, Building2, MoreHorizontal } from "lucide-react"
+import { ChevronLeft, ChevronRight, Calculator, Home, CalendarIcon, Beef, Building2, MoreHorizontal, Sailboat } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ko } from "date-fns/locale"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -20,11 +20,13 @@ import { ReservationForm } from "@/components/ReservationForm"
 
 type DailySettlement = {
     accommodation_id: string;
-    category: 'accommodation' | 'meat' | 'other';
+    category: 'accommodation' | 'meat' | 'jetboat' | 'other';
     settlement_date: string;
     is_paid: boolean;
     paid_date: string | null;
 }
+
+type CatRes = { id: string; name: string };
 
 type AggregatedData = {
     accommodation_id: string;
@@ -32,9 +34,15 @@ type AggregatedData = {
     dates: {
         [date: string]: {
             date: string;
-            reservations: { name: string, id: string }[];
+            reservations: CatRes[]; // 모든 예약 (호환용)
+            // 카테고리별로 실제 정산 금액이 있는 예약만 모음
+            accommodation_reservations: CatRes[];
+            meat_reservations: CatRes[];
+            jetboat_reservations: CatRes[];
+            other_reservations: CatRes[];
             accommodation_amount: number;
             meat_amount: number;
+            jetboat_amount: number;
             other_amount: number;
         }
     }
@@ -76,7 +84,12 @@ export default function SettlementsPage() {
             .lte("settlement_date", end)
 
         if (statuses) {
-            setDailySettlements(statuses)
+            // accommodation_id가 null인 행(숙소 미지정)은 가상 ID '__none__'로 정규화해 비교 일관성 확보
+            const normalized = statuses.map(s => ({
+                ...s,
+                accommodation_id: s.accommodation_id ?? "__none__",
+            }))
+            setDailySettlements(normalized)
         }
 
         // 2. Fetch reservations and amounts
@@ -93,9 +106,12 @@ export default function SettlementsPage() {
                 accommodation_settlements (
                     category,
                     amount
+                ),
+                reservation_tickets (
+                    quantity,
+                    tickets ( name )
                 )
             `)
-            .eq("reservation_type", "accommodation")
             .gte("date", start)
             .lte("date", end)
 
@@ -107,14 +123,18 @@ export default function SettlementsPage() {
 
         const aggregated: Record<string, AggregatedData> = {}
 
+        const NO_ACC = "__none__"
+
         reservations?.forEach((res: any) => {
-            const accId = res.accommodation_id
-            if (!accId) return
+            const accId: string = res.accommodation_id || NO_ACC
+            const accName: string = res.accommodation_id
+                ? (res.accommodations?.name || "숙소명 없음")
+                : "숙소 미지정 (당일 등)"
 
             if (!aggregated[accId]) {
                 aggregated[accId] = {
                     accommodation_id: accId,
-                    accommodation_name: res.accommodations?.name || "숙소명 없음",
+                    accommodation_name: accName,
                     dates: {}
                 }
             }
@@ -124,8 +144,13 @@ export default function SettlementsPage() {
                 aggregated[accId].dates[rDate] = {
                     date: rDate,
                     reservations: [],
+                    accommodation_reservations: [],
+                    meat_reservations: [],
+                    jetboat_reservations: [],
+                    other_reservations: [],
                     accommodation_amount: 0,
                     meat_amount: 0,
+                    jetboat_amount: 0,
                     other_amount: 0,
                 }
             }
@@ -135,14 +160,33 @@ export default function SettlementsPage() {
                 aggregated[accId].dates[rDate].reservations.push({ id: res.id, name: res.customer_name })
             }
 
+            const cell = aggregated[accId].dates[rDate]
+            const resRef: CatRes = { id: res.id, name: res.customer_name }
+            const pushIfNew = (list: CatRes[]) => {
+                if (!list.find(r => r.id === resRef.id)) list.push(resRef)
+            }
+
+            // 제트보트 이용권을 보유한 예약은 정산 금액 누락 확인 목적으로 노출
+            const hasJetboatTicket = res.reservation_tickets?.some(
+                (rt: any) => rt.tickets?.name?.includes("제트보트")
+            )
+            if (hasJetboatTicket) pushIfNew(cell.jetboat_reservations)
+
             res.accommodation_settlements?.forEach((settlement: any) => {
                 const amount = settlement.amount || 0
+                if (amount <= 0) return
                 if (settlement.category === "accommodation") {
-                    aggregated[accId].dates[rDate].accommodation_amount += amount
+                    cell.accommodation_amount += amount
+                    pushIfNew(cell.accommodation_reservations)
                 } else if (settlement.category === "meat") {
-                    aggregated[accId].dates[rDate].meat_amount += amount
+                    cell.meat_amount += amount
+                    pushIfNew(cell.meat_reservations)
+                } else if (settlement.category === "jetboat") {
+                    cell.jetboat_amount += amount
+                    pushIfNew(cell.jetboat_reservations)
                 } else if (settlement.category === "other") {
-                    aggregated[accId].dates[rDate].other_amount += amount
+                    cell.other_amount += amount
+                    pushIfNew(cell.other_reservations)
                 }
             })
         })
@@ -160,10 +204,13 @@ export default function SettlementsPage() {
 
     const handleUpdatePaymentStatus = async (
         accId: string,
-        category: 'accommodation' | 'meat' | 'other',
+        category: 'accommodation' | 'meat' | 'jetboat' | 'other',
         dateStr: string,
         updates: Partial<{ is_paid: boolean, paid_date: string | null }>
     ) => {
+        // 가상 ID(__none__)는 DB에 저장 시 null로 (숙소 미지정 예약 — 제트보트 등)
+        const dbAccId: string | null = accId === "__none__" ? null : accId
+
         const existing = dailySettlements.find(s =>
             s.accommodation_id === accId && s.category === category && s.settlement_date === dateStr
         )
@@ -189,20 +236,44 @@ export default function SettlementsPage() {
             }]
         })
 
-        const { error } = await supabase
-            .from("daily_settlements")
-            .upsert({
-                accommodation_id: accId,
-                category,
-                settlement_date: dateStr,
-                is_paid: isPaid,
-                paid_date: paidDate ? paidDate : null,
-                updated_at: new Date().toISOString()
-            }, { onConflict: "accommodation_id, category, settlement_date" })
+        // 수동 upsert: accommodation_id가 null이면 onConflict 기본 unique 인덱스가
+        // null 값을 unique로 안 보기 때문에 SELECT → UPDATE/INSERT 로 분기한다.
+        let error: any = null
+        const payload = {
+            accommodation_id: dbAccId,
+            category,
+            settlement_date: dateStr,
+            is_paid: isPaid,
+            paid_date: paidDate ? paidDate : null,
+            updated_at: new Date().toISOString(),
+        }
+
+        if (dbAccId === null) {
+            // null 케이스: 기존 행 찾아 update, 없으면 insert
+            let q = supabase
+                .from("daily_settlements")
+                .select("id")
+                .is("accommodation_id", null)
+                .eq("category", category)
+                .eq("settlement_date", dateStr)
+                .maybeSingle()
+            const { data: found, error: selErr } = await q
+            if (selErr) {
+                error = selErr
+            } else if (found?.id) {
+                ;({ error } = await supabase.from("daily_settlements").update(payload).eq("id", found.id))
+            } else {
+                ;({ error } = await supabase.from("daily_settlements").insert(payload))
+            }
+        } else {
+            ;({ error } = await supabase
+                .from("daily_settlements")
+                .upsert(payload, { onConflict: "accommodation_id, category, settlement_date" }))
+        }
 
         if (error) {
             console.error("Error updating payment status:", error)
-            alert("정산 상태 업데이트에 실패했습니다.")
+            alert("정산 상태 업데이트에 실패했습니다.\n" + (error.message || ""))
             fetchSettlements(currentDate)
         }
     }
@@ -218,14 +289,23 @@ export default function SettlementsPage() {
     const getAmountForCategory = (d: any, category: string) => {
         if (category === 'accommodation') return d.accommodation_amount;
         if (category === 'meat') return d.meat_amount;
+        if (category === 'jetboat') return d.jetboat_amount;
         if (category === 'other') return d.other_amount;
         return 0;
+    }
+
+    const getReservationsForCategory = (d: any, category: string): CatRes[] => {
+        if (category === 'accommodation') return d.accommodation_reservations || [];
+        if (category === 'meat') return d.meat_reservations || [];
+        if (category === 'jetboat') return d.jetboat_reservations || [];
+        if (category === 'other') return d.other_reservations || [];
+        return [];
     }
 
     const renderSettlementRow = (
         rowKey: string,
         accommodationId: string,
-        category: 'accommodation' | 'meat' | 'other',
+        category: 'accommodation' | 'meat' | 'jetboat' | 'other',
         date: string,
         reservations: { id: string; name: string }[],
         amount: number,
@@ -262,8 +342,10 @@ export default function SettlementsPage() {
                 <div className="flex justify-center">
                     <Checkbox
                         checked={isPaid}
-                        disabled={!isAdmin}
+                        disabled={!isAdmin || amount <= 0}
+                        title={amount <= 0 ? "정산 금액이 0원입니다. 예약에서 금액을 먼저 입력해주세요." : undefined}
                         onCheckedChange={(checked) => {
+                            if (amount <= 0) return
                             const paid = !!checked
                             const newDate = paid && !paidDate ? format(new Date(), "yyyy-MM-dd") : (!paid ? null : paidDate)
                             handleUpdatePaymentStatus(accommodationId, category, date, {
@@ -276,7 +358,7 @@ export default function SettlementsPage() {
                 </div>
             </TableCell>
             <TableCell className="text-center align-middle">
-                {isPaid && (
+                {isPaid && amount > 0 && (
                     <Popover>
                         <PopoverTrigger asChild>
                             <Button
@@ -341,7 +423,7 @@ export default function SettlementsPage() {
                                 accData.accommodation_id,
                                 category,
                                 d.date,
-                                d.reservations,
+                                getReservationsForCategory(d, category),
                                 amount,
                                 status?.is_paid || false,
                                 status?.paid_date || null,
@@ -421,7 +503,11 @@ export default function SettlementsPage() {
         )
     }
 
-    const renderMeatContent = () => {
+    const renderFlatContent = (
+        category: 'meat' | 'jetboat',
+        emptyLabel: string,
+        EmptyIcon: typeof Beef,
+    ) => {
         if (isLoading) {
             return <div className="py-12 text-center text-muted-foreground">데이터를 불러오는 중입니다...</div>
         }
@@ -432,20 +518,23 @@ export default function SettlementsPage() {
 
         Object.values(aggregatedData).forEach(acc => {
             Object.values(acc.dates).forEach(d => {
-                if (d.meat_amount > 0) {
-                    const status = getStatus(acc.accommodation_id, 'meat', d.date);
+                const amount = getAmountForCategory(d, category);
+                const reservations = getReservationsForCategory(d, category);
+                // 금액이 있거나, 정산 금액은 없어도 카테고리에 해당하는 예약이 있으면 노출
+                if (amount > 0 || reservations.length > 0) {
+                    const status = getStatus(acc.accommodation_id, category, d.date);
                     flatList.push({
                         accommodation_id: acc.accommodation_id,
                         accommodation_name: acc.accommodation_name,
                         date: d.date,
-                        reservations: d.reservations,
-                        amount: d.meat_amount,
+                        reservations,
+                        amount,
                         is_paid: status?.is_paid || false,
                         paid_date: status?.paid_date || null
                     });
-                    totalAmount += d.meat_amount;
-                    if (!status?.is_paid) {
-                        unpaidAmount += d.meat_amount;
+                    totalAmount += amount;
+                    if (!status?.is_paid && amount > 0) {
+                        unpaidAmount += amount;
                     }
                 }
             });
@@ -454,8 +543,8 @@ export default function SettlementsPage() {
         if (flatList.length === 0) {
             return (
                 <div className="py-12 text-center text-muted-foreground flex flex-col items-center gap-2">
-                    <Beef className="h-10 w-10 text-muted-foreground/30" />
-                    <p>이 달에 등록된 고기 정산 내역이 없습니다.</p>
+                    <EmptyIcon className="h-10 w-10 text-muted-foreground/30" />
+                    <p>이 달에 등록된 {emptyLabel} 정산 내역이 없습니다.</p>
                 </div>
             )
         }
@@ -496,7 +585,7 @@ export default function SettlementsPage() {
                             {flatList.map((item, idx) => renderSettlementRow(
                                 `${item.accommodation_id}-${item.date}-${idx}`,
                                 item.accommodation_id,
-                                'meat',
+                                category,
                                 item.date,
                                 item.reservations,
                                 item.amount,
@@ -538,16 +627,17 @@ export default function SettlementsPage() {
             </div>
 
             <Tabs defaultValue="accommodation" className="w-full">
-                <TabsList className="grid w-full grid-cols-3 mb-6 h-12">
+                <TabsList className="grid w-full grid-cols-4 mb-6 h-12">
                     <TabsTrigger value="accommodation" className="text-base h-10">숙소 정산</TabsTrigger>
                     <TabsTrigger value="meat" className="text-base h-10">고기 정산</TabsTrigger>
+                    <TabsTrigger value="jetboat" className="text-base h-10">제트보트 정산</TabsTrigger>
                     <TabsTrigger value="other" className="text-base h-10">기타 정산</TabsTrigger>
                 </TabsList>
-                
+
                 <TabsContent value="accommodation" className="mt-0">
                     {renderTabContent('accommodation')}
                 </TabsContent>
-                
+
                 <TabsContent value="meat" className="mt-0">
                     <div className="bg-rose-50 border border-rose-200 text-rose-800 p-4 rounded-lg mb-4 flex items-start gap-3 shadow-sm">
                         <Beef className="h-5 w-5 mt-0.5 shrink-0" />
@@ -556,7 +646,18 @@ export default function SettlementsPage() {
                             <p className="text-sm mt-1 opacity-90">고기 정산은 숙소별로 나누지 않고 <strong>양지촌</strong>으로 모두 취합하여 진행됩니다. 전체 일자별 내역을 확인하고 정산 상태를 체크하세요.</p>
                         </div>
                     </div>
-                    {renderMeatContent()}
+                    {renderFlatContent('meat', '고기', Beef)}
+                </TabsContent>
+
+                <TabsContent value="jetboat" className="mt-0">
+                    <div className="bg-cyan-50 border border-cyan-200 text-cyan-800 p-4 rounded-lg mb-4 flex items-start gap-3 shadow-sm">
+                        <Sailboat className="h-5 w-5 mt-0.5 shrink-0" />
+                        <div>
+                            <h4 className="font-semibold">제트보트 일괄 정산</h4>
+                            <p className="text-sm mt-1 opacity-90">예약별 제트보트 이용 금액을 일자별로 취합하여 정산 상태를 관리합니다.</p>
+                        </div>
+                    </div>
+                    {renderFlatContent('jetboat', '제트보트', Sailboat)}
                 </TabsContent>
 
                 <TabsContent value="other" className="mt-0">

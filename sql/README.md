@@ -68,6 +68,7 @@
 | `yp_daily_sales_v6.sql` | v6 — 이용권/아이템 모델(yp_products·yp_sales·yp_sale_items) 전부 폐기하고 일별 집계 테이블 yp_daily_sales(날짜·카드·현금·계좌이체·합계·메모)로 전면 재설계. v1~v5 는 모두 이 파일로 대체됨 |
 | `yp_daily_sales_allow_dup_v7.sql` | v7 — yp_daily_sales.date 의 UNIQUE 제약 제거. 같은 날짜에 여러 매출 행 입력 허용 (오전/오후 등 분리 기록) |
 | `yp_daily_sales_add_methods_v8.sql` | **v8 (현행)** — 결제 수단 추가: 예약금(이체)·네이버. total_amount = 카드+현금+이체+예약금(이체)+네이버 |
+| `add_jetboat_settlement_category.sql` | 가평 정산 카테고리에 `jetboat` 추가. accommodation_settlements / daily_settlements 의 CHECK 제약 갱신 |
 
 ---
 
