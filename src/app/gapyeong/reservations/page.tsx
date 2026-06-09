@@ -150,7 +150,7 @@ function ReservationsContent() {
 
     // Column Visibility State
     const [visibleColumns, setVisibleColumns] = useState({
-        type: true, date: true, customer: true, headcount: true,
+        type: true, date: true, customer: true, headcount: true, dog_count: true,
         accommodation: true, ticket: true, pickup: true,
         payment: true, notes: true, status: true, visit: true,
     })
@@ -417,6 +417,7 @@ function ReservationsContent() {
             "예약자명": res.customer_name,
             "전화번호": formatPhone(res.phone || ""),
             "인원": res.headcount,
+            "댕댕이": Number(res.dog_count) || 0,
             "이용권": (res.reservation_tickets || []).map((rt: any) => `${rt.tickets?.name}(${rt.quantity})`).join(", ") || "",
             "숙박": res.accommodations?.name ? `${res.accommodations.name}${res.rooms?.name ? ` (${res.rooms.name})` : ""}` : "",
             "예약금": Number(res.deposit || 0),
@@ -559,8 +560,8 @@ function ReservationsContent() {
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
                                     {Object.entries({
-                                        type: "유형", date: "날짜", customer: "예약자", headcount: "인원", 
-                                        accommodation: "숙소", ticket: "이용권", pickup: "픽업", 
+                                        type: "유형", date: "날짜", customer: "예약자", headcount: "인원", dog_count: "댕댕이",
+                                        accommodation: "숙소", ticket: "이용권", pickup: "픽업",
                                         payment: "결제", notes: "메모", status: "상태", visit: "방문"
                                     }).map(([key, label]) => (
                                         <div key={key} className="flex items-center space-x-2">
@@ -636,6 +637,7 @@ function ReservationsContent() {
                                     </TableHead>
                                 )}
                                 {visibleColumns.headcount && <TableHead className="whitespace-nowrap">인원</TableHead>}
+                                {visibleColumns.dog_count && <TableHead className="whitespace-nowrap">댕댕이</TableHead>}
                                 {visibleColumns.accommodation && <TableHead className="whitespace-nowrap">숙소</TableHead>}
                                 {visibleColumns.ticket && <TableHead className="whitespace-nowrap">이용권</TableHead>}
                                 {visibleColumns.pickup && <TableHead className="whitespace-nowrap">픽업</TableHead>}
@@ -648,11 +650,11 @@ function ReservationsContent() {
                         <TableBody>
                             {isLoading ? (
                                 <TableRow>
-                                    <TableCell colSpan={13} className="text-center">불러오는 중...</TableCell>
+                                    <TableCell colSpan={14} className="text-center">불러오는 중...</TableCell>
                                 </TableRow>
                             ) : filteredReservations?.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
+                                    <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">
                                         {searchKeyword ? "검색 결과가 없습니다." : "해당 기간에 예약이 없습니다."}
                                     </TableCell>
                                 </TableRow>
@@ -704,6 +706,7 @@ function ReservationsContent() {
                                         </TableCell>
                                     )}
                                     {visibleColumns.headcount && <TableCell>{res.headcount || 1}명</TableCell>}
+                                    {visibleColumns.dog_count && <TableCell>{Number(res.dog_count) || 0}마리</TableCell>}
                                     {visibleColumns.accommodation && (
                                         <TableCell className="max-w-[120px] truncate" title={res.accommodations?.name ? `${res.accommodations.name}${res.reservation_rooms && res.reservation_rooms.length > 0 ? ` (${res.reservation_rooms.map((rr:any)=>rr.rooms?.name).join(', ')})` : ""}` : ""}>
                                             {res.accommodations?.name ? (

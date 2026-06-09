@@ -1,7 +1,7 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Users, DollarSign, Activity, CalendarDays, Lock, Wallet, ReceiptText, MapPin, Clock, ChevronRight, TrendingUp, CreditCard, Store, Share2, PiggyBank } from "lucide-react"
+import { Users, DollarSign, Activity, CalendarDays, Lock, Wallet, ReceiptText, MapPin, Clock, ChevronRight, TrendingUp, CreditCard, Store, Share2, PiggyBank, Dog } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { useQuery } from "@tanstack/react-query"
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, startOfDay, endOfDay, isSameDay, addDays, differenceInCalendarDays } from "date-fns"
@@ -120,7 +120,7 @@ export default function DashboardPage() {
     queryFn: async () => {
       const { data: reservations, error } = await supabase
         .from("reservations")
-        .select("date, total_amount, deposit, is_deposit_paid, status, customer_name, reservation_type, headcount, balance_payment_method, balance_payments")
+        .select("date, total_amount, deposit, is_deposit_paid, status, customer_name, reservation_type, headcount, dog_count, balance_payment_method, balance_payments")
         .gte("date", startStr)
         .lte("date", endStr)
         .neq("status", "cancelled")
@@ -129,7 +129,7 @@ export default function DashboardPage() {
       if (error) {
         console.error("Error fetching reservations:", error)
         return {
-          totalSales: 0, expectedSales: 0, activeReservations: 0, visitorCount: 0,
+          totalSales: 0, expectedSales: 0, activeReservations: 0, visitorCount: 0, dogCount: 0,
           avgPerReservation: 0, avgPerVisitor: 0, unpaidDepositTotal: 0,
           chartData: [], weekdayChart: [],
           salesBreakdown: { transfer: 0, cash: 0, card: 0, place: 0, social: 0, store: 0 }
@@ -206,6 +206,7 @@ export default function DashboardPage() {
 
       const activeReservations = reservations?.length || 0
       const visitorCount = reservations?.reduce((acc, curr) => acc + (Number(curr.headcount) || 0), 0) || 0
+      const dogCount = reservations?.reduce((acc, curr) => acc + (Number(curr.dog_count) || 0), 0) || 0
       const avgPerReservation = activeReservations > 0 ? Math.round(totalSales / activeReservations) : 0
       const avgPerVisitor = visitorCount > 0 ? Math.round(totalSales / visitorCount) : 0
 
@@ -225,7 +226,7 @@ export default function DashboardPage() {
       }))
 
       return {
-        totalSales, expectedSales, activeReservations, visitorCount,
+        totalSales, expectedSales, activeReservations, visitorCount, dogCount,
         avgPerReservation, avgPerVisitor, unpaidDepositTotal,
         chartData, weekdayChart, salesBreakdown,
       }
@@ -265,7 +266,7 @@ export default function DashboardPage() {
   })
 
   const finalStats = stats || {
-    totalSales: 0, expectedSales: 0, activeReservations: 0, visitorCount: 0,
+    totalSales: 0, expectedSales: 0, activeReservations: 0, visitorCount: 0, dogCount: 0,
     avgPerReservation: 0, avgPerVisitor: 0, unpaidDepositTotal: 0,
     chartData: [], weekdayChart: [],
     salesBreakdown: { transfer: 0, cash: 0, card: 0, place: 0, social: 0, store: 0 }
@@ -335,7 +336,7 @@ export default function DashboardPage() {
       <div className="relative">
         <div className={cn("space-y-6 transition-all duration-300", !isUnlocked && "blur-md select-none pointer-events-none")}>
           {/* KPI Grid (Top) */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <KPICard
               label="총 예상 매출"
               value={formatWon(finalStats.expectedSales)}
@@ -366,6 +367,14 @@ export default function DashboardPage() {
               icon={Users}
               tone="emerald"
               hint="기간 내 방문자 합계"
+              onClick={() => handleNavigateWithFilter()}
+            />
+            <KPICard
+              label="총 댕댕이"
+              value={`${finalStats.dogCount.toLocaleString()}마리`}
+              icon={Dog}
+              tone="rose"
+              hint="기간 내 반려견 동반 합계"
               onClick={() => handleNavigateWithFilter()}
             />
           </div>

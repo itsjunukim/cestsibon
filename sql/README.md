@@ -69,6 +69,7 @@
 | `yp_daily_sales_allow_dup_v7.sql` | v7 — yp_daily_sales.date 의 UNIQUE 제약 제거. 같은 날짜에 여러 매출 행 입력 허용 (오전/오후 등 분리 기록) |
 | `yp_daily_sales_add_methods_v8.sql` | **v8 (현행)** — 결제 수단 추가: 예약금(이체)·네이버. total_amount = 카드+현금+이체+예약금(이체)+네이버 |
 | `add_jetboat_settlement_category.sql` | 가평 정산 카테고리에 `jetboat` 추가. accommodation_settlements / daily_settlements 의 CHECK 제약 갱신 |
+| `add_dog_count_and_park_ticket.sql` | 가평 reservations 에 dog_count 컬럼 추가 (댕댕이 마릿수). 이용권은 관리자가 별도 등록 |
 
 ---
 

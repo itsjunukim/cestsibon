@@ -36,6 +36,7 @@ const formSchema = z.object({
     phone: z.string().optional(),
     date: z.date(),
     headcount: z.string().min(1, "인원을 입력해주세요"), // Changed to string to avoid z.coerce issues
+    dog_count: z.string().optional(),
     selected_tickets: z.array(z.object({
         ticket_id: z.string(),
         quantity: z.number().min(1)
@@ -74,6 +75,7 @@ export interface ReservationData {
     phone?: string | null
     date?: string | Date | null
     headcount?: number | string | null
+    dog_count?: number | string | null
     total_amount?: number | string | null
     deposit?: number | string | null
     balance_payment_method?: string | null
@@ -147,6 +149,7 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
             phone: initialData?.phone || "",
             date: initialData?.date ? new Date(initialData.date) : new Date(),
             headcount: initialData?.headcount ? String(initialData.headcount) : "1",
+            dog_count: initialData?.dog_count != null ? String(initialData.dog_count) : "0",
             total_amount: initialData?.total_amount ? String(initialData.total_amount) : "0",
             deposit: initialData?.deposit ? String(initialData.deposit) : "0",
             balance_payment_method: initialData?.balance_payment_method || "",
@@ -240,6 +243,7 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                 ...reservationData,
                 date: format(reservationData.date, "yyyy-MM-dd"),
                 headcount: Number(reservationData.headcount),
+                dog_count: Number(reservationData.dog_count) || 0,
                 total_amount: Number(String(reservationData.total_amount).replace(/[^0-9]/g, '')),
                 deposit: Number(String(reservationData.deposit).replace(/[^0-9]/g, '')),
                 balance: balance,
@@ -543,19 +547,34 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                     )}
                 />
 
-                <FormField
-                    control={form.control}
-                    name="headcount"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>인원</FormLabel>
-                            <FormControl>
-                                <Input type="number" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
+                <div className="grid grid-cols-2 gap-3">
+                    <FormField
+                        control={form.control}
+                        name="headcount"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>인원</FormLabel>
+                                <FormControl>
+                                    <Input type="number" min="1" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="dog_count"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>댕댕이</FormLabel>
+                                <FormControl>
+                                    <Input type="number" min="0" placeholder="0" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                </div>
 
                 <FormField
                     control={form.control}
