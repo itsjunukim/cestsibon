@@ -605,7 +605,7 @@ function ReservationsContent() {
             {/* Desktop View */}
             <Card ref={tableRef} className="hidden md:block">
                 <CardHeader>
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center gap-4">
                         <CardTitle>예약 목록
                             {dateRange?.from && (
                                 <span className="text-sm font-normal text-muted-foreground ml-2">
@@ -613,6 +613,22 @@ function ReservationsContent() {
                                 </span>
                             )}
                         </CardTitle>
+                        {(() => {
+                            const totalPeople = (filteredReservations || []).reduce((acc: number, r: any) => acc + (Number(r.headcount) || 0), 0)
+                            const totalDogs = (filteredReservations || []).reduce((acc: number, r: any) => acc + (Number(r.dog_count) || 0), 0)
+                            return (
+                                <div className="flex justify-end gap-4">
+                                    <div className="flex flex-col items-end">
+                                        <span className="text-muted-foreground text-sm">방문자</span>
+                                        <span className="font-bold text-slate-700 text-lg tabular-nums">{totalPeople.toLocaleString()}명</span>
+                                    </div>
+                                    <div className="flex flex-col items-end">
+                                        <span className="text-muted-foreground text-sm">댕댕이</span>
+                                        <span className="font-bold text-slate-700 text-lg tabular-nums">{totalDogs.toLocaleString()}마리</span>
+                                    </div>
+                                </div>
+                            )
+                        })()}
                     </div>
                 </CardHeader>
                 <CardContent className="overflow-x-auto">
