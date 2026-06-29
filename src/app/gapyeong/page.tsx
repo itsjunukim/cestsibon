@@ -274,16 +274,16 @@ export default function DashboardPage() {
 
   const handleChartClick = (data: any) => {
     if (data && data.fullDate) {
-      router.push(`/reservations?date=${data.fullDate}`)
+      router.push(`/gapyeong/reservations?date=${data.fullDate}`)
     }
   }
 
   const handleReservationClick = (id: string) => {
-    router.push(`/reservations?edit=${id}`)
+    router.push(`/gapyeong/reservations?edit=${id}`)
   }
 
   const handleNavigateWithFilter = (paymentMethod?: string) => {
-    let url = `/reservations?start=${startStr}&end=${endStr}`
+    let url = `/gapyeong/reservations?start=${startStr}&end=${endStr}`
     if (paymentMethod) {
       url += `&payment=${paymentMethod}`
     }

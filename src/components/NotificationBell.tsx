@@ -129,7 +129,7 @@ export function NotificationBell() {
 
     const handleAlertClick = (reservationId: string) => {
         setOpen(false)
-        router.push(`/reservations?edit=${reservationId}`)
+        router.push(`/gapyeong/reservations?edit=${reservationId}`)
     }
 
     const handleDismissCustom = async (e: React.MouseEvent, alertId: string) => {
