@@ -131,7 +131,9 @@ CREATE TABLE reservations (
 | headcount | INT | 인원수 |
 | accommodation_id | BIGINT | 숙소 ID (FK) |
 | room_id | BIGINT | 객실 ID (FK) |
-| total_amount | NUMERIC | 총 금액 (₩) |
+| total_amount | NUMERIC | 총 금액 (₩) — 최종 정산 기준 금액 |
+| deposit | NUMERIC | 예약금 납부액 (실제 입금된 금액) |
+| refund | NUMERIC | 환불금 (과다 입금 후 되돌려준 금액). 잔금 = total_amount − deposit + refund |
 | status | VARCHAR | 상태 (booked/completed/cancelled) |
 | is_deposit_paid | BOOLEAN | 예약금 납부 여부 |
 | deposit_paid_date | DATE | 예약금 납부 날짜 |

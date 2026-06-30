@@ -120,17 +120,29 @@ export default function DashboardPage() {
     queryFn: async () => {
       const { data: reservations, error } = await supabase
         .from("reservations")
-        .select("date, total_amount, deposit, is_deposit_paid, status, customer_name, reservation_type, headcount, dog_count, balance_payment_method, balance_payments")
+        .select("date, total_amount, deposit, refund, is_deposit_paid, status, customer_name, reservation_type, headcount, dog_count, balance_payment_method, balance_payments, accommodation_id, accommodation_settlements(category, amount)")
         .gte("date", startStr)
         .lte("date", endStr)
         .neq("status", "cancelled")
         .order('date', { ascending: false })
+
+      const { data: dailySettlements } = await supabase
+        .from("daily_settlements")
+        .select("accommodation_id, category, settlement_date, is_paid")
+        .gte("settlement_date", startStr)
+        .lte("settlement_date", endStr)
+        .eq("is_paid", true)
+
+      const paidSettlementKeys = new Set(
+        (dailySettlements || []).map(s => `${s.accommodation_id ?? "__none__"}|${s.category}|${s.settlement_date}`)
+      )
 
       if (error) {
         console.error("Error fetching reservations:", error)
         return {
           totalSales: 0, expectedSales: 0, activeReservations: 0, visitorCount: 0, dogCount: 0,
           avgPerReservation: 0, avgPerVisitor: 0, unpaidDepositTotal: 0,
+          paidSettlementTotal: 0, netAfterSettlement: 0,
           chartData: [], weekdayChart: [],
           salesBreakdown: { transfer: 0, cash: 0, card: 0, place: 0, social: 0, store: 0 }
         }
@@ -139,6 +151,7 @@ export default function DashboardPage() {
       let totalSales = 0
       let expectedSales = 0
       let unpaidDepositTotal = 0
+      let paidSettlementTotal = 0
       const salesBreakdown = { transfer: 0, cash: 0, card: 0, place: 0, social: 0, store: 0 }
       const chartMap: Record<string, number> = {}
       const weekdaySales = [0, 0, 0, 0, 0, 0, 0]
@@ -156,7 +169,8 @@ export default function DashboardPage() {
       reservations?.forEach(res => {
         const total = Number(res.total_amount) || 0
         const deposit = Number(res.deposit) || 0
-        const balance = total - deposit
+        const refund = Number(res.refund) || 0
+        const balance = total - deposit + refund
         const legacyMethod = res.balance_payment_method
         const splitPayments = Array.isArray(res.balance_payments) ? res.balance_payments : []
 
@@ -166,13 +180,14 @@ export default function DashboardPage() {
         // --- 실현(정산 완료) 매출 계산 ---
         let realized = 0
 
-        // 예약금: booked + 미입금이면 제외, 그 외엔 실현으로 인정
+        // 예약금: booked + 미입금이면 제외, 그 외엔 (예약금 - 환불금)만 실현으로 인정
         const isUnpaidDeposit = !res.is_deposit_paid && res.status === 'booked' && deposit > 0
         if (isUnpaidDeposit) {
             unpaidDepositTotal += deposit
         } else if (deposit > 0) {
-            realized += deposit
-            salesBreakdown.transfer += deposit
+            const netDeposit = Math.max(0, deposit - refund)
+            realized += netDeposit
+            salesBreakdown.transfer += netDeposit
         }
 
         // 잔금: 결제수단이 확정(정산)된 부분만 실현으로 인정, 미정산은 제외
@@ -202,6 +217,17 @@ export default function DashboardPage() {
             const wd = new Date(res.date).getDay()
             weekdaySales[wd] += realized
         }
+
+        // 정산 관리에서 정산 완료(is_paid=true) 처리된 카테고리 금액 합계
+        const settlements = Array.isArray((res as any).accommodation_settlements) ? (res as any).accommodation_settlements : []
+        const accKey = res.accommodation_id ?? "__none__"
+        settlements.forEach((s: any) => {
+            const amt = Number(s?.amount) || 0
+            if (amt <= 0) return
+            if (paidSettlementKeys.has(`${accKey}|${s.category}|${res.date}`)) {
+                paidSettlementTotal += amt
+            }
+        })
       })
 
       const activeReservations = reservations?.length || 0
@@ -228,6 +254,8 @@ export default function DashboardPage() {
       return {
         totalSales, expectedSales, activeReservations, visitorCount, dogCount,
         avgPerReservation, avgPerVisitor, unpaidDepositTotal,
+        paidSettlementTotal,
+        netAfterSettlement: totalSales - paidSettlementTotal,
         chartData, weekdayChart, salesBreakdown,
       }
     }
@@ -268,6 +296,7 @@ export default function DashboardPage() {
   const finalStats = stats || {
     totalSales: 0, expectedSales: 0, activeReservations: 0, visitorCount: 0, dogCount: 0,
     avgPerReservation: 0, avgPerVisitor: 0, unpaidDepositTotal: 0,
+    paidSettlementTotal: 0, netAfterSettlement: 0,
     chartData: [], weekdayChart: [],
     salesBreakdown: { transfer: 0, cash: 0, card: 0, place: 0, social: 0, store: 0 }
   }
@@ -336,7 +365,7 @@ export default function DashboardPage() {
       <div className="relative">
         <div className={cn("space-y-6 transition-all duration-300", !isUnlocked && "blur-md select-none pointer-events-none")}>
           {/* KPI Grid (Top) */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
             <KPICard
               label="총 예상 매출"
               value={formatWon(finalStats.expectedSales)}
@@ -352,6 +381,14 @@ export default function DashboardPage() {
               tone="indigo"
               hint="정산 완료된 실현 매출"
               onClick={() => handleNavigateWithFilter()}
+            />
+            <KPICard
+              label="정산 후 순매출"
+              value={formatWon(finalStats.netAfterSettlement)}
+              icon={TrendingUp}
+              tone="emerald"
+              hint={`정산 지출 ${formatWon(finalStats.paidSettlementTotal)} 차감`}
+              onClick={() => router.push('/gapyeong/settlements')}
             />
             <KPICard
               label="예약"

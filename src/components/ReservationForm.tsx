@@ -47,6 +47,7 @@ const formSchema = z.object({
     pickup_time: z.string().optional(),
     total_amount: z.string(), // Changed to string
     deposit: z.string(), // Changed to string
+    refund: z.string().optional(),
     balance_payment_method: z.string().optional(),
     balance_payments: z.array(z.object({
         method: z.string().min(1, "수단 필수"),
@@ -78,6 +79,7 @@ export interface ReservationData {
     dog_count?: number | string | null
     total_amount?: number | string | null
     deposit?: number | string | null
+    refund?: number | string | null
     balance_payment_method?: string | null
     balance_payments?: any[] | null
     is_deposit_paid?: boolean | null
@@ -152,6 +154,7 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
             dog_count: initialData?.dog_count != null ? String(initialData.dog_count) : "0",
             total_amount: initialData?.total_amount ? String(initialData.total_amount) : "0",
             deposit: initialData?.deposit ? String(initialData.deposit) : "0",
+            refund: initialData?.refund ? String(initialData.refund) : "0",
             balance_payment_method: initialData?.balance_payment_method || "",
             balance_payments: initialData?.balance_payments ? 
                 initialData.balance_payments.map((p: any) => ({ method: p.method, amount: String(p.amount) })) : 
@@ -232,7 +235,8 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
     // Calculate balance automatically
     const totalAmount = Number(String(form.watch("total_amount") || "0").replace(/[^0-9]/g, ''))
     const deposit = Number(String(form.watch("deposit") || "0").replace(/[^0-9]/g, ''))
-    const balance = totalAmount - deposit
+    const refund = Number(String(form.watch("refund") || "0").replace(/[^0-9]/g, ''))
+    const balance = totalAmount - deposit + refund
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         setIsLoading(true)
@@ -246,6 +250,7 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                 dog_count: Number(reservationData.dog_count) || 0,
                 total_amount: Number(String(reservationData.total_amount).replace(/[^0-9]/g, '')),
                 deposit: Number(String(reservationData.deposit).replace(/[^0-9]/g, '')),
+                refund: Number(String(reservationData.refund || "0").replace(/[^0-9]/g, '')),
                 balance: balance,
                 balance_payments: reservationData.balance_payments ? reservationData.balance_payments.map(p => ({
                     method: p.method,
@@ -864,7 +869,7 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                                     </FormItem>
                                 )}
                             />
-                            
+
                             <FormField
                                 control={form.control}
                                 name="is_deposit_paid"
@@ -940,6 +945,28 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                                     <span className="absolute right-3 pointer-events-none">원</span>
                                 </div>
                             </div>
+
+                            <FormField
+                                control={form.control}
+                                name="refund"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <div className="flex items-center h-7">
+                                            <FormLabel className="font-bold text-slate-700">환불금</FormLabel>
+                                        </div>
+                                        <FormControl>
+                                            <div className="relative flex items-center">
+                                                <Input type="text" placeholder="0" className="h-11 bg-white pr-8 text-right" {...field} onChange={(e) => {
+                                                    const raw = e.target.value.replace(/[^0-9]/g, "");
+                                                    field.onChange(raw ? Number(raw).toLocaleString() : "");
+                                                }} value={field.value ? Number(String(field.value).replace(/[^0-9]/g, "")).toLocaleString() : ""} />
+                                                <span className="absolute right-3 text-sm text-slate-500 font-bold pointer-events-none">원</span>
+                                            </div>
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
 
                             {balance > 0 && balanceFields.length <= 1 && (
                                 <FormItem>

@@ -313,7 +313,8 @@ function ReservationsContent() {
         if (paymentFilter) {
             const total = Number(res.total_amount) || 0
             const deposit = Number(res.deposit) || 0
-            const balance = total - deposit
+            const refund = Number(res.refund) || 0
+            const balance = total - deposit + refund
             const legacyMethod = res.balance_payment_method
             const splitPayments = Array.isArray(res.balance_payments) ? res.balance_payments : []
 
@@ -421,6 +422,7 @@ function ReservationsContent() {
             "이용권": (res.reservation_tickets || []).map((rt: any) => `${rt.tickets?.name}(${rt.quantity})`).join(", ") || "",
             "숙박": res.accommodations?.name ? `${res.accommodations.name}${res.rooms?.name ? ` (${res.rooms.name})` : ""}` : "",
             "예약금": Number(res.deposit || 0),
+            "환불금": Number(res.refund || 0),
             "픽업위치": res.pickup_location || "",
             "시간": res.pickup_time || "",
             "총 결제금액": Number(res.total_amount || 0),
@@ -759,7 +761,8 @@ function ReservationsContent() {
                                         const mLabel = (m: string | null | undefined) => m === 'transfer' ? '이체' : m === 'card' ? '카드' : m === 'cash' ? '현금' : m === 'place' ? '플레이스' : m === 'store' ? '스토어' : m === 'social' ? '소셜' : null
                                         const splitPayments = Array.isArray(res.balance_payments) ? res.balance_payments.filter((p: any) => p?.method && p.method !== 'none') : []
                                         const isSplit = splitPayments.length > 0
-                                        const settled = isSplit || (!!res.balance_payment_method && res.balance_payment_method !== 'none')
+                                        const fullyPaidByDeposit = Number(res.balance) === 0 && !!res.is_deposit_paid
+                                        const settled = isSplit || (!!res.balance_payment_method && res.balance_payment_method !== 'none') || fullyPaidByDeposit
                                         const methodLabel = isSplit
                                             ? splitPayments.map((p: any) => mLabel(p.method)).filter(Boolean).join('+')
                                             : mLabel(res.balance_payment_method)
@@ -784,6 +787,12 @@ function ReservationsContent() {
                                                         )}
                                                     </div>
                                                 </div>
+                                                {Number(res.refund) > 0 && (
+                                                    <div className="flex justify-between items-center text-[11px]">
+                                                        <span className="text-slate-600 font-bold">환불금</span>
+                                                        <span className="text-slate-800 font-bold">-{fmtMoney(res.refund)}</span>
+                                                    </div>
+                                                )}
                                                 {Number(res.balance) > 0 && (
                                                     <div className="flex justify-between items-center text-[11px] mt-0.5">
                                                         <span className={settled ? "text-slate-600 font-bold" : "text-red-600 font-bold"}>잔금</span>
@@ -922,6 +931,12 @@ function ReservationsContent() {
                                         <span className="text-foreground font-medium">예약금</span>
                                         <span className="font-medium">{fmtMoney(res.deposit)}</span>
                                     </div>
+                                    {Number(res.refund) > 0 &&
+                                        <div className="flex justify-between text-xs">
+                                            <span className="text-foreground font-medium">환불금</span>
+                                            <span className="font-medium">-{fmtMoney(res.refund)}</span>
+                                        </div>
+                                    }
                                     {Number(res.balance) > 0 &&
                                         <div className="flex justify-between text-red-600 font-bold">
                                             <span>잔금</span>
