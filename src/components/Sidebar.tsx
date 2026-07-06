@@ -16,7 +16,8 @@ import {
     Ticket,
     Users,
     LogOut,
-    Calculator
+    Calculator,
+    StickyNote
 } from "lucide-react"
 
 import { useRouter } from "next/navigation"
@@ -35,6 +36,7 @@ const SITE_CONFIG: Record<SiteKey, { home: string; logo: string; title: string; 
             { icon: Ticket, label: "이용권 관리", href: "/gapyeong/tickets" },
             { icon: BedDouble, label: "숙소 관리", href: "/gapyeong/accommodations" },
             { icon: Calculator, label: "정산 관리", href: "/gapyeong/settlements" },
+            { icon: StickyNote, label: "메모", href: "/gapyeong/notes" },
         ],
     },
     yangpyeong: {

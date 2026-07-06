@@ -10,18 +10,16 @@ interface PinUnlockDialogProps {
   isOpen: boolean
   onClose: () => void
   onUnlock: () => void
+  correctPin?: string
 }
 
-export function PinUnlockDialog({ isOpen, onClose, onUnlock }: PinUnlockDialogProps) {
+export function PinUnlockDialog({ isOpen, onClose, onUnlock, correctPin = "9105" }: PinUnlockDialogProps) {
   const [pin, setPin] = useState("")
   const [error, setError] = useState(false)
 
-  // Hardcoded PIN
-  const CORRECT_PIN = "9105"
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (pin === CORRECT_PIN) {
+    if (pin === correctPin) {
       setError(false)
       setPin("")
       onUnlock()

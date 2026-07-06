@@ -18,7 +18,8 @@ import {
     Users,
     LogOut,
     Menu,
-    Calculator
+    Calculator,
+    StickyNote
 } from "lucide-react"
 
 type SiteKey = "gapyeong" | "yangpyeong"
@@ -35,6 +36,7 @@ const SITE_MENU: Record<SiteKey, { home: string; logo: string; title: string; su
             { icon: Ticket, label: "이용권 관리", href: "/gapyeong/tickets" },
             { icon: BedDouble, label: "숙소 관리", href: "/gapyeong/accommodations" },
             { icon: Calculator, label: "정산 관리", href: "/gapyeong/settlements" },
+            { icon: StickyNote, label: "메모", href: "/gapyeong/notes" },
         ],
         bottom: [
             { icon: LayoutDashboard, label: "영업현황", href: "/gapyeong" },

@@ -538,6 +538,38 @@ AND 오늘 ≤ date ≤ 오늘 + 2일
 
 ---
 
+## 8b. 메모 (/gapyeong/notes)
+
+### 8b.1 목적
+중요 사이트 계정 정보, 정산 계좌, 공유해야 할 팀 메모 등을 한 곳에 저장.
+
+### 8b.2 접근 통제
+- 대시보드와 별도의 PIN(**4185**)으로 잠금 해제
+- 잠금 해제 상태는 페이지 세션 동안만 유지 (다시 방문 시 PIN 재입력)
+- 역할 기반 제한 없음 — 로그인된 모든 사용자가 열람·수정 가능
+
+### 8b.3 데이터 구조
+```
+notes (단일 행)
+├── content: TEXT (전체 메모 본문)
+├── updated_at: TIMESTAMPTZ
+└── updated_by: UUID (auth.users FK)
+
+notes_history (append-only 스냅샷)
+├── note_id: UUID (notes FK)
+├── content: TEXT (저장 시점의 스냅샷)
+├── updated_at, updated_by
+```
+`notes` UPDATE/INSERT 시 트리거로 `notes_history`에 스냅샷 자동 기록.
+
+### 8b.4 UI
+- 커다란 textarea 하나 + 저장 버튼
+- "저장되지 않은 변경사항 있음" 경고 표시
+- 하단에 마지막 저장 시각 + 저장자 이메일
+- 변경 기록은 UI에 노출되지 않음 → `notes_history` 테이블(백업/감사 용도)에만 저장. 필요 시 관리자가 DB에서 조회
+
+---
+
 ## 9. 모바일 UI/UX
 
 ### 8.1 하단 탭 바
