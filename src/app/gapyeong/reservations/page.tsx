@@ -148,11 +148,14 @@ function ReservationsContent() {
     // Sorting State
     const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'reservation_type', direction: 'asc' })
 
+    // Date filter mode: 'visit' = 방문일, 'created' = 등록일 (default: 방문일)
+    const [dateFilterMode, setDateFilterMode] = useState<'visit' | 'created'>('visit')
+
     // Column Visibility State
     const [visibleColumns, setVisibleColumns] = useState({
         type: true, date: true, customer: true, headcount: true, dog_count: true,
         accommodation: true, ticket: true, pickup: true,
-        payment: true, notes: true, status: true, visit: true,
+        payment: true, notes: true, status: true, visit: true, created_at: true,
     })
     const toggleColumn = (key: keyof typeof visibleColumns) => {
         setVisibleColumns(prev => ({ ...prev, [key]: !prev[key] }))
@@ -162,19 +165,29 @@ function ReservationsContent() {
     const queryClient = useQueryClient()
 
     const { data: reservations, isLoading } = useQuery({
-        queryKey: ["reservations", dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : "all", dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : "all", sortConfig],
+        queryKey: ["reservations", dateFilterMode, dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : "all", dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : "all", sortConfig],
         queryFn: async () => {
             let query = supabase
                 .from("reservations")
                 .select("*, accommodations(name), reservation_rooms(room_id, rooms(name)), reservation_tickets(ticket_id, quantity, tickets(name))")
 
-            if (dateRange?.from) {
-                const fromStr = format(dateRange.from, "yyyy-MM-dd")
-                query = query.gte("date", fromStr)
-            }
-            if (dateRange?.to) {
-                const toStr = format(dateRange.to, "yyyy-MM-dd")
-                query = query.lte("date", toStr)
+            if (dateFilterMode === 'created') {
+                // 등록일(created_at, timestamptz) 필터: 하루 전체 범위 포함
+                if (dateRange?.from) {
+                    query = query.gte("created_at", startOfDay(dateRange.from).toISOString())
+                }
+                if (dateRange?.to) {
+                    query = query.lte("created_at", endOfDay(dateRange.to).toISOString())
+                }
+            } else {
+                if (dateRange?.from) {
+                    const fromStr = format(dateRange.from, "yyyy-MM-dd")
+                    query = query.gte("date", fromStr)
+                }
+                if (dateRange?.to) {
+                    const toStr = format(dateRange.to, "yyyy-MM-dd")
+                    query = query.lte("date", toStr)
+                }
             }
 
             // Apply Sort
@@ -426,6 +439,7 @@ function ReservationsContent() {
             "픽업위치": res.pickup_location || "",
             "시간": res.pickup_time || "",
             "총 결제금액": Number(res.total_amount || 0),
+            "예약 등록일": res.created_at ? format(new Date(res.created_at), "yyyy-MM-dd HH:mm") : "",
         }))
 
         // Create workbook and worksheet
@@ -443,6 +457,7 @@ function ReservationsContent() {
             { wch: 16 }, // 픽업위치
             { wch: 8  }, // 시간
             { wch: 14 }, // 총 결제금액
+            { wch: 18 }, // 예약 등록일
         ];
 
         // A4 세로 인쇄 설정
@@ -510,6 +525,29 @@ function ReservationsContent() {
                         />
                     </div>
 
+                    <div className="flex items-center border bg-slate-100/80 rounded-md p-1 shadow-sm h-9" title="날짜 필터 기준">
+                        <button
+                            type="button"
+                            onClick={() => setDateFilterMode('visit')}
+                            className={cn(
+                                "h-7 px-3 text-xs font-semibold rounded transition-colors",
+                                dateFilterMode === 'visit' ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                            )}
+                        >
+                            방문일
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setDateFilterMode('created')}
+                            className={cn(
+                                "h-7 px-3 text-xs font-semibold rounded transition-colors",
+                                dateFilterMode === 'created' ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                            )}
+                        >
+                            등록일
+                        </button>
+                    </div>
+
                     <div className="flex items-center space-x-1 border bg-slate-100/80 rounded-md p-1 shadow-sm h-9 w-full md:w-auto">
                         <Button variant="ghost" size="sm" onClick={setToday} className="flex-1 md:flex-none h-7 text-xs px-2.5 font-semibold hover:bg-white text-slate-700">오늘</Button>
                         <Button variant="ghost" size="sm" onClick={setThisWeek} className="flex-1 md:flex-none h-7 text-xs px-2.5 font-semibold hover:bg-white text-slate-700">이번주</Button>
@@ -564,7 +602,7 @@ function ReservationsContent() {
                                     {Object.entries({
                                         type: "유형", date: "날짜", customer: "예약자", headcount: "인원", dog_count: "댕댕이",
                                         accommodation: "숙소", ticket: "이용권", pickup: "픽업",
-                                        payment: "결제", notes: "메모", status: "상태", visit: "방문"
+                                        payment: "결제", notes: "메모", status: "상태", visit: "방문", created_at: "예약 등록일"
                                     }).map(([key, label]) => (
                                         <div key={key} className="flex items-center space-x-2">
                                             <Checkbox 
@@ -611,7 +649,7 @@ function ReservationsContent() {
                         <CardTitle>예약 목록
                             {dateRange?.from && (
                                 <span className="text-sm font-normal text-muted-foreground ml-2">
-                                    ({format(dateRange.from, "yyyy-MM-dd")} ~ {dateRange.to ? format(dateRange.to, "yyyy-MM-dd") : ""})
+                                    ({dateFilterMode === 'created' ? '등록일' : '방문일'} {format(dateRange.from, "yyyy-MM-dd")} ~ {dateRange.to ? format(dateRange.to, "yyyy-MM-dd") : ""})
                                 </span>
                             )}
                         </CardTitle>
@@ -662,17 +700,22 @@ function ReservationsContent() {
                                 {visibleColumns.payment && <TableHead className="whitespace-nowrap">결제 정보</TableHead>}
                                 {visibleColumns.notes && <TableHead className="whitespace-nowrap">메모</TableHead>}
                                 {visibleColumns.status && <TableHead className="whitespace-nowrap">상태</TableHead>}
+                                {visibleColumns.created_at && (
+                                    <TableHead className="whitespace-nowrap cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('created_at')}>
+                                        <div className="flex items-center gap-1">예약 등록일<ArrowUpDown className="h-3 w-3" /></div>
+                                    </TableHead>
+                                )}
                                 <TableHead className="text-right whitespace-nowrap">관리</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {isLoading ? (
                                 <TableRow>
-                                    <TableCell colSpan={14} className="text-center">불러오는 중...</TableCell>
+                                    <TableCell colSpan={15} className="text-center">불러오는 중...</TableCell>
                                 </TableRow>
                             ) : filteredReservations?.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">
+                                    <TableCell colSpan={15} className="text-center py-8 text-muted-foreground">
                                         {searchKeyword ? "검색 결과가 없습니다." : "해당 기간에 예약이 없습니다."}
                                     </TableCell>
                                 </TableRow>
@@ -836,6 +879,11 @@ function ReservationsContent() {
                                             </div>
                                         </TableCell>
                                     )}
+                                    {visibleColumns.created_at && (
+                                        <TableCell className="whitespace-nowrap text-xs text-slate-600 tabular-nums">
+                                            {res.created_at ? format(new Date(res.created_at), "yyyy-MM-dd HH:mm") : "-"}
+                                        </TableCell>
+                                    )}
                                     <TableCell className="text-right">
                                         <div className="flex justify-end gap-1">
                                             <Button variant="ghost" size="icon" title={isAdmin ? "수정" : "조회"} onClick={() => openEditDialog(res)} className="h-8 w-8">
@@ -951,15 +999,20 @@ function ReservationsContent() {
                                     </div>
                                 )}
                             </CardContent>
-                            <div className="flex items-center justify-end gap-2 p-3 border-t bg-muted/20">
-                                <Button size="sm" variant="ghost" onClick={() => openEditDialog(res)}>
-                                    <Pencil className="h-4 w-4 mr-1" /> {isAdmin ? "수정" : "조회"}
-                                </Button>
-                                {res.status === 'cancelled' && (
-                                    <Button size="sm" variant="ghost" title="영구 삭제" onClick={() => deleteReservation(res.id)} disabled={!isAdmin} className="text-red-500 hover:text-red-700 hover:bg-red-50">
-                                        <Trash2 className="h-4 w-4" />
+                            <div className="flex items-center justify-between gap-2 p-3 border-t bg-muted/20">
+                                <span className="text-[11px] text-muted-foreground tabular-nums">
+                                    등록 {res.created_at ? format(new Date(res.created_at), "yyyy-MM-dd HH:mm") : "-"}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                    <Button size="sm" variant="ghost" onClick={() => openEditDialog(res)}>
+                                        <Pencil className="h-4 w-4 mr-1" /> {isAdmin ? "수정" : "조회"}
                                     </Button>
-                                )}
+                                    {res.status === 'cancelled' && (
+                                        <Button size="sm" variant="ghost" title="영구 삭제" onClick={() => deleteReservation(res.id)} disabled={!isAdmin} className="text-red-500 hover:text-red-700 hover:bg-red-50">
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
                         </Card>
                     ))
