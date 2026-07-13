@@ -199,7 +199,7 @@ function ReservationsContent() {
             if (sortConfig.key === 'reservation_type') {
                 query = query
                     .order('reservation_type', { ascending: sortConfig.direction === 'asc' })
-                    .order('date', { ascending: true })
+                    .order('created_at', { ascending: true })
             } else if (sortConfig.key === 'date') {
                 query = query
                     .order('date', { ascending: sortConfig.direction === 'asc' })
