@@ -26,6 +26,15 @@ export function DateRangePicker({
     date,
     onDateChange,
 }: DateRangePickerProps) {
+    const [numMonths, setNumMonths] = React.useState(1)
+    React.useEffect(() => {
+        const mq = window.matchMedia("(min-width: 768px)")
+        const update = () => setNumMonths(mq.matches ? 2 : 1)
+        update()
+        mq.addEventListener("change", update)
+        return () => mq.removeEventListener("change", update)
+    }, [])
+
     const handlePresetSelect = (days: number) => {
         if (days === 0) {
             onDateChange?.({
@@ -59,11 +68,11 @@ export function DateRangePicker({
                         id="date"
                         variant={"outline"}
                         className={cn(
-                            "w-[260px] justify-start text-left font-normal",
+                            "w-full md:w-[220px] justify-start text-left font-normal",
                             !date && "text-muted-foreground"
                         )}
                     >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
                         {date?.from ? (
                             date.to ? (
                                 <>
@@ -78,7 +87,7 @@ export function DateRangePicker({
                         )}
                     </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="end">
+                <PopoverContent className="w-auto max-w-[95vw] p-0" align="end">
                     <div className="flex flex-col sm:flex-row">
                         <div className="p-3 border-b sm:border-b-0 sm:border-r space-y-2 flex flex-col min-w-[120px]">
                             <span className="text-xs font-medium text-muted-foreground mb-1 px-2">기간 설정</span>
@@ -108,7 +117,7 @@ export function DateRangePicker({
                                 defaultMonth={date?.from}
                                 selected={date}
                                 onSelect={onDateChange}
-                                numberOfMonths={2}
+                                numberOfMonths={numMonths}
                             />
                         </div>
                     </div>

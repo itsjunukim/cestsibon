@@ -23,7 +23,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { Plus, Check, Filter, Pencil, Trash2, ArrowUpDown, Download, Columns, Search, Ban, Share2 } from "lucide-react"
+import { Plus, Check, Filter, Pencil, Trash2, ArrowUpDown, Download, Columns, Search, Ban, Share2, ChevronLeft, ChevronRight } from "lucide-react"
 import { useUserRole } from "@/hooks/useUserRole"
 import * as XLSX from 'xlsx';
 import { ReservationForm } from "@/components/ReservationForm"
@@ -139,9 +139,22 @@ function ReservationsContent() {
 
     const setThisMonth = () => {
         const today = new Date()
-        setDateRange({ 
-            from: startOfMonth(today), 
-            to: endOfMonth(today) 
+        setDateRange({
+            from: startOfMonth(today),
+            to: endOfMonth(today)
+        })
+    }
+
+    // 어제/내일: 현재 선택된 날짜 범위를 하루씩 이동 (범위 폭 유지)
+    const shiftDays = (days: number) => {
+        setDateRange(prev => {
+            if (!prev?.from) {
+                const target = addDays(new Date(), days)
+                return { from: startOfDay(target), to: endOfDay(target) }
+            }
+            const from = addDays(prev.from, days)
+            const to = prev.to ? addDays(prev.to, days) : from
+            return { from, to }
         })
     }
 
@@ -492,7 +505,7 @@ function ReservationsContent() {
                     예약 관리
                 </h1>
 
-                <div className="flex flex-wrap items-center gap-3 mt-4 md:mt-0 w-full md:w-auto">
+                <div className="flex flex-col md:flex-row md:flex-wrap md:items-center gap-2 md:gap-3 mt-4 md:mt-0 w-full md:w-auto">
                     {paymentFilter && (
                         <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 px-3 py-1.5 rounded-full text-sm font-medium">
                             결제 필터: {
@@ -525,12 +538,13 @@ function ReservationsContent() {
                         />
                     </div>
 
-                    <div className="flex items-center border bg-slate-100/80 rounded-md p-1 shadow-sm h-9" title="날짜 필터 기준">
+                    <div className="flex items-stretch gap-2 w-full md:contents">
+                    <div className="flex items-center border bg-slate-100/80 rounded-md p-0.5 md:p-1 shadow-sm h-9 shrink-0" title="날짜 필터 기준">
                         <button
                             type="button"
                             onClick={() => setDateFilterMode('visit')}
                             className={cn(
-                                "h-7 px-3 text-xs font-semibold rounded transition-colors",
+                                "h-full px-2.5 md:px-3 text-xs font-semibold rounded transition-colors",
                                 dateFilterMode === 'visit' ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
                             )}
                         >
@@ -540,7 +554,7 @@ function ReservationsContent() {
                             type="button"
                             onClick={() => setDateFilterMode('created')}
                             className={cn(
-                                "h-7 px-3 text-xs font-semibold rounded transition-colors",
+                                "h-full px-2.5 md:px-3 text-xs font-semibold rounded transition-colors",
                                 dateFilterMode === 'created' ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
                             )}
                         >
@@ -548,17 +562,28 @@ function ReservationsContent() {
                         </button>
                     </div>
 
-                    <div className="flex items-center space-x-1 border bg-slate-100/80 rounded-md p-1 shadow-sm h-9 w-full md:w-auto">
-                        <Button variant="ghost" size="sm" onClick={setToday} className="flex-1 md:flex-none h-7 text-xs px-2.5 font-semibold hover:bg-white text-slate-700">오늘</Button>
-                        <Button variant="ghost" size="sm" onClick={setThisWeek} className="flex-1 md:flex-none h-7 text-xs px-2.5 font-semibold hover:bg-white text-slate-700">이번주</Button>
-                        <Button variant="ghost" size="sm" onClick={setThisMonth} className="flex-1 md:flex-none h-7 text-xs px-2.5 font-semibold hover:bg-white text-slate-700">이번달</Button>
+                    <div className="flex items-center space-x-1 border bg-slate-100/80 rounded-md p-0.5 md:p-1 shadow-sm h-9 flex-1 md:w-auto md:flex-none">
+                        <Button variant="ghost" size="sm" onClick={setToday} className="flex-1 md:flex-none h-full text-xs px-1.5 md:px-2.5 font-semibold hover:bg-white text-slate-700">오늘</Button>
+                        <Button variant="ghost" size="sm" onClick={setThisWeek} className="flex-1 md:flex-none h-full text-xs px-1.5 md:px-2.5 font-semibold hover:bg-white text-slate-700">이번주</Button>
+                        <Button variant="ghost" size="sm" onClick={setThisMonth} className="flex-1 md:flex-none h-full text-xs px-1.5 md:px-2.5 font-semibold hover:bg-white text-slate-700">이번달</Button>
+                    </div>
                     </div>
 
-                    <DateRangePicker
-                        date={dateRange}
-                        onDateChange={setDateRange}
-                    />
+                    <div className="flex items-center gap-1.5 w-full md:w-auto">
+                        <Button variant="outline" size="icon" onClick={() => shiftDays(-1)} className="h-9 w-9 shrink-0" title="어제">
+                            <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <DateRangePicker
+                            className="flex-1 md:flex-none"
+                            date={dateRange}
+                            onDateChange={setDateRange}
+                        />
+                        <Button variant="outline" size="icon" onClick={() => shiftDays(1)} className="h-9 w-9 shrink-0" title="내일">
+                            <ChevronRight className="h-4 w-4" />
+                        </Button>
+                    </div>
 
+                    <div className="flex justify-end w-full md:contents">
                     <div className="flex items-center space-x-1 border bg-background rounded-md h-9 px-1 shadow-sm">
                         <Button variant="ghost" className="h-7 w-7 p-0 hover:bg-muted" onClick={() => setDateRange(undefined)} title="날짜 필터 초기화(전체 보기)">
                             <Filter className="h-4 w-4 text-foreground" />
@@ -619,6 +644,7 @@ function ReservationsContent() {
                             </div>
                         </PopoverContent>
                     </Popover>
+                    </div>
                     </div>
 
                     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -905,6 +931,28 @@ function ReservationsContent() {
 
             {/* Mobile View */}
             <div className="md:hidden space-y-4">
+                {/* 모바일 방문자/댕댕이 합계 요약 */}
+                {(() => {
+                    const totalPeople = (filteredReservations || []).reduce((acc: number, r: any) => acc + (Number(r.headcount) || 0), 0)
+                    const totalDogs = (filteredReservations || []).reduce((acc: number, r: any) => acc + (Number(r.dog_count) || 0), 0)
+                    return (
+                        <div className="flex items-center justify-between gap-3 rounded-lg border bg-white p-3 shadow-sm">
+                            <span className="text-sm font-semibold text-muted-foreground">
+                                예약 {(filteredReservations || []).length}건
+                            </span>
+                            <div className="flex items-center gap-4">
+                                <div className="flex items-baseline gap-1">
+                                    <span className="text-xs text-muted-foreground">방문자</span>
+                                    <span className="text-base font-bold text-slate-700 tabular-nums">{totalPeople.toLocaleString()}명</span>
+                                </div>
+                                <div className="flex items-baseline gap-1">
+                                    <span className="text-xs text-muted-foreground">댕댕이</span>
+                                    <span className="text-base font-bold text-slate-700 tabular-nums">{totalDogs.toLocaleString()}마리</span>
+                                </div>
+                            </div>
+                        </div>
+                    )
+                })()}
                 {isLoading ? (
                     <div className="text-center py-8">불러오는 중...</div>
                 ) : filteredReservations?.length === 0 ? (
@@ -920,7 +968,9 @@ function ReservationsContent() {
                                     <div>
                                         <CardTitle className="text-lg flex items-center gap-2">
                                             {res.customer_name}
-                                            <span className="text-sm font-normal text-muted-foreground">({res.headcount}명)</span>
+                                            <span className="text-sm font-normal text-muted-foreground">
+                                                ({res.headcount || 1}명{Number(res.dog_count) > 0 ? ` · 🐶${Number(res.dog_count)}마리` : ""})
+                                            </span>
                                         </CardTitle>
                                         <CardDescription className="mt-1 text-foreground font-medium">
                                             {format(new Date(res.date), "yyyy-MM-dd(E)", { locale: ko })} • {formatPhone(res.phone || "") || "연락처 없음"}
