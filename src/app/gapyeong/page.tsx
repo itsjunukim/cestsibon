@@ -1,7 +1,7 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Users, DollarSign, Activity, CalendarDays, Lock, Wallet, ReceiptText, MapPin, Clock, ChevronRight, TrendingUp, CreditCard, Store, Share2, PiggyBank, Dog } from "lucide-react"
+import { Users, DollarSign, Activity, CalendarDays, Lock, Wallet, ReceiptText, MapPin, Clock, ChevronLeft, ChevronRight, TrendingUp, CreditCard, Store, Share2, PiggyBank, Dog } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { useQuery } from "@tanstack/react-query"
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, startOfDay, endOfDay, isSameDay, addDays, differenceInCalendarDays } from "date-fns"
@@ -103,6 +103,18 @@ export default function DashboardPage() {
   const handleUnlockSuccess = () => {
     setIsUnlocked(true)
     setIsPinDialogOpen(false)
+  }
+
+  const shiftDays = (days: number) => {
+    setDateRange(prev => {
+      if (!prev?.from) {
+        const target = addDays(new Date(), days)
+        return { from: startOfDay(target), to: endOfDay(target) }
+      }
+      const from = addDays(prev.from, days)
+      const to = prev.to ? addDays(prev.to, days) : from
+      return { from, to }
+    })
   }
 
   const start = dateRange?.from ? startOfDay(dateRange.from) : startOfDay(new Date())
@@ -357,7 +369,15 @@ export default function DashboardPage() {
                 setDateRange({ from: startOfMonth(today), to: endOfMonth(today) })
               }} className="md:w-16 rounded-md h-8 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100">이번 달</Button>
             </div>
-            <DateRangePicker date={dateRange} onDateChange={setDateRange} />
+            <div className="flex items-center gap-1.5">
+              <Button variant="outline" size="icon" onClick={() => shiftDays(-1)} className="h-9 w-9 shrink-0" title="어제">
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <DateRangePicker date={dateRange} onDateChange={setDateRange} />
+              <Button variant="outline" size="icon" onClick={() => shiftDays(1)} className="h-9 w-9 shrink-0" title="내일">
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         )}
       </div>

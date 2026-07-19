@@ -680,8 +680,10 @@ function ReservationsContent() {
                             )}
                         </CardTitle>
                         {(() => {
-                            const totalPeople = (filteredReservations || []).reduce((acc: number, r: any) => acc + (Number(r.headcount) || 0), 0)
-                            const totalDogs = (filteredReservations || []).reduce((acc: number, r: any) => acc + (Number(r.dog_count) || 0), 0)
+                            // 취소된 예약은 방문자·댕댕이 합계에서 제외 (영업 현황 대시보드와 동일 기준)
+                            const activeForTotals = (filteredReservations || []).filter((r: any) => r.status !== 'cancelled')
+                            const totalPeople = activeForTotals.reduce((acc: number, r: any) => acc + (Number(r.headcount) || 0), 0)
+                            const totalDogs = activeForTotals.reduce((acc: number, r: any) => acc + (Number(r.dog_count) || 0), 0)
                             return (
                                 <div className="flex justify-end gap-4">
                                     <div className="flex flex-col items-end">
@@ -933,8 +935,10 @@ function ReservationsContent() {
             <div className="md:hidden space-y-4">
                 {/* 모바일 방문자/댕댕이 합계 요약 */}
                 {(() => {
-                    const totalPeople = (filteredReservations || []).reduce((acc: number, r: any) => acc + (Number(r.headcount) || 0), 0)
-                    const totalDogs = (filteredReservations || []).reduce((acc: number, r: any) => acc + (Number(r.dog_count) || 0), 0)
+                    // 취소된 예약은 방문자·댕댕이 합계에서 제외 (영업 현황 대시보드와 동일 기준)
+                    const activeForTotals = (filteredReservations || []).filter((r: any) => r.status !== 'cancelled')
+                    const totalPeople = activeForTotals.reduce((acc: number, r: any) => acc + (Number(r.headcount) || 0), 0)
+                    const totalDogs = activeForTotals.reduce((acc: number, r: any) => acc + (Number(r.dog_count) || 0), 0)
                     return (
                         <div className="flex items-center justify-between gap-3 rounded-lg border bg-white p-3 shadow-sm">
                             <span className="text-sm font-semibold text-muted-foreground">
