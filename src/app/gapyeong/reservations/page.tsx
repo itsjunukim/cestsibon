@@ -117,7 +117,7 @@ function ReservationsContent() {
                 setEditingReservation(data)
                 setSelectedRowId(data.id)
                 setIsDialogOpen(true)
-                router.replace('/reservations', { scroll: false })
+                router.replace('/gapyeong/reservations', { scroll: false })
             }
         }
         loadAndEdit()
