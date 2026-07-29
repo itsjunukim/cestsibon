@@ -757,9 +757,11 @@ function ReservationsContent() {
                                         }
                                     }}
                                     className={cn(
-                                        "text-sm transition-colors cursor-pointer", 
+                                        "text-sm transition-colors cursor-pointer",
                                         res.is_visited && "bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/40",
-                                        selectedRowId === res.id && "bg-amber-100/80 hover:bg-amber-200 shadow-[inset_0_0_0_2px_#f59e0b] z-10 relative"
+                                        selectedRowId === res.id && "bg-amber-100/80 hover:bg-amber-200 shadow-[inset_0_0_0_2px_#f59e0b] z-10 relative",
+                                        // 취소된 예약: 라인 전체에 짙은 회색 레이어를 덮어 한눈에 구분 (상태 배지만 z-index로 레이어 위에 노출)
+                                        res.status === 'cancelled' && "relative isolate bg-slate-300 hover:bg-slate-300 [&>td]:text-slate-500 after:absolute after:inset-0 after:z-[1] after:bg-slate-500/45 after:pointer-events-none after:content-['']"
                                     )}
                                 >
                                     <TableCell className="text-center font-medium text-muted-foreground">{index + 1}</TableCell>
@@ -892,7 +894,7 @@ function ReservationsContent() {
                                         </TableCell>
                                     )}
                                     {visibleColumns.status && (
-                                        <TableCell>
+                                        <TableCell className="relative z-[2]">
                                             <div onClick={(e) => e.stopPropagation()}>
                                                 <Select value={res.status} onValueChange={(val) => handleStatusChange(res, val)} disabled={!isAdmin}>
                                                     <SelectTrigger className={`h-7 px-3 py-1 border-0 rounded-full text-xs font-semibold whitespace-nowrap w-fit shadow-sm focus:ring-0 focus:ring-offset-0 ${res.status === 'completed' ? 'bg-green-100 text-green-700 hover:bg-green-200' : res.status === 'cancelled' ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'}`}>
@@ -965,8 +967,8 @@ function ReservationsContent() {
                     </div>
                 ) : (
                     filteredReservations?.map((res: any) => (
-                        <Card key={res.id} className="overflow-hidden">
-                            <div className={`h-2 w-full ${res.reservation_type === 'accommodation' ? 'bg-indigo-500' : 'bg-orange-500'}`} />
+                        <Card key={res.id} className={cn("overflow-hidden", res.status === 'cancelled' && "relative isolate border-slate-400 after:absolute after:inset-0 after:z-[1] after:bg-slate-500/40 after:pointer-events-none after:content-['']")}>
+                            <div className={`h-2 w-full ${res.status === 'cancelled' ? 'bg-slate-400' : res.reservation_type === 'accommodation' ? 'bg-indigo-500' : 'bg-orange-500'}`} />
                             <CardHeader className="pb-2 pt-4">
                                 <div className="flex justify-between items-start">
                                     <div>
@@ -980,7 +982,7 @@ function ReservationsContent() {
                                             {format(new Date(res.date), "yyyy-MM-dd(E)", { locale: ko })} • {formatPhone(res.phone || "") || "연락처 없음"}
                                         </CardDescription>
                                     </div>
-                                    <div onClick={(e) => e.stopPropagation()}>
+                                    <div onClick={(e) => e.stopPropagation()} className="relative z-[2]">
                                         <Select value={res.status} onValueChange={(val) => handleStatusChange(res, val)} disabled={!isAdmin}>
                                             <SelectTrigger className={`h-7 px-3 py-1 border-0 rounded-full text-xs font-semibold whitespace-nowrap w-fit shadow-sm focus:ring-0 focus:ring-offset-0 ${res.status === 'completed' ? 'bg-green-100 text-green-700 hover:bg-green-200' : res.status === 'cancelled' ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'}`}>
                                                 <SelectValue />
