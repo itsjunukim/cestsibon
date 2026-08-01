@@ -245,8 +245,10 @@ export default function DashboardPage() {
       const activeReservations = reservations?.length || 0
       const visitorCount = reservations?.reduce((acc, curr) => acc + (Number(curr.headcount) || 0), 0) || 0
       const dogCount = reservations?.reduce((acc, curr) => acc + (Number(curr.dog_count) || 0), 0) || 0
+      const netAfterSettlement = totalSales - paidSettlementTotal
       const avgPerReservation = activeReservations > 0 ? Math.round(totalSales / activeReservations) : 0
-      const avgPerVisitor = visitorCount > 0 ? Math.round(totalSales / visitorCount) : 0
+      // 객단가: 정산 후 순매출 기준 (총 매출 - 정산 완료 지출) ÷ 방문객 수
+      const avgPerVisitor = visitorCount > 0 ? Math.round(netAfterSettlement / visitorCount) : 0
 
       const days = eachDayOfInterval({ start, end })
       const chartData = days.map(day => {
@@ -267,7 +269,7 @@ export default function DashboardPage() {
         totalSales, expectedSales, activeReservations, visitorCount, dogCount,
         avgPerReservation, avgPerVisitor, unpaidDepositTotal,
         paidSettlementTotal,
-        netAfterSettlement: totalSales - paidSettlementTotal,
+        netAfterSettlement,
         chartData, weekdayChart, salesBreakdown,
       }
     }
@@ -496,7 +498,7 @@ export default function DashboardPage() {
               value={formatWon(finalStats.avgPerVisitor)}
               icon={Activity}
               tone="cyan"
-              hint="방문객 1인당 평균 매출"
+              hint="정산 후 순매출 ÷ 방문객"
             />
             <KPICard
               label="예약금 미입금"
