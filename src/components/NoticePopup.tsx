@@ -18,8 +18,8 @@ export function NoticePopup() {
             return
         }
 
-        const hideNoticePermanently = localStorage.getItem("hideUpdateNotice_202607_v8")
-        const hideNoticeThisSession = sessionStorage.getItem("hideUpdateNoticeSession_202607_v8")
+        const hideNoticePermanently = localStorage.getItem("hideUpdateNotice_202608_v9")
+        const hideNoticeThisSession = sessionStorage.getItem("hideUpdateNoticeSession_202608_v9")
 
         if (!hideNoticePermanently && !hideNoticeThisSession) {
             // Small delay to let page render first
@@ -32,10 +32,10 @@ export function NoticePopup() {
 
     const handleClose = () => {
         if (doNotShow) {
-            localStorage.setItem("hideUpdateNotice_202607_v8", "true")
+            localStorage.setItem("hideUpdateNotice_202608_v9", "true")
         } else {
             // 세션 스토리지에 저장하여, 탭을 닫거나 재로그인하기 전까지는 다시 안 뜨게 함
-            sessionStorage.setItem("hideUpdateNoticeSession_202607_v8", "true")
+            sessionStorage.setItem("hideUpdateNoticeSession_202608_v9", "true")
         }
         setOpen(false)
     }
@@ -51,13 +51,29 @@ export function NoticePopup() {
                         <div className="bg-primary/10 p-2 rounded-full">
                             <Megaphone className="h-5 w-5 text-primary" />
                         </div>
-                        시스템 업데이트 안내 (2026-07-30)
+                        시스템 업데이트 안내 (2026-08-10)
                     </DialogTitle>
                 </DialogHeader>
                 <div className="space-y-3 py-4 text-sm text-slate-700">
                     <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                        <h4 className="font-bold text-sm mb-1 text-slate-800">취소된 예약 한눈에 구분 🗂️</h4>
-                        <p className="leading-relaxed text-slate-600 text-xs">예약 목록에서 상태가 <b>&apos;취소됨&apos;</b>인 예약은 이제 <b>줄 전체가 짙은 회색으로 흐리게</b> 표시됩니다. 정상 예약과 취소 예약이 한눈에 구분되어, 목록을 검토할 때 취소 건을 빠르게 걸러낼 수 있습니다. (PC 목록·모바일 카드 모두 적용)</p>
+                        <h4 className="font-bold text-sm mb-1 text-slate-800">픽업 인원 모아보기 🚌</h4>
+                        <p className="leading-relaxed text-slate-600 text-xs">목록 툴바의 <b>🚌 버튼</b>을 누르면 조회 기간의 픽업이 <b>장소별·시간순</b>으로 정리됩니다. 전화번호를 누르면 바로 통화되고, <b>복사</b> 버튼으로 기사님께 그대로 보낼 수 있습니다.</p>
+                    </div>
+                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                        <h4 className="font-bold text-sm mb-1 text-slate-800">숙소별 인원 한눈에 📊</h4>
+                        <p className="leading-relaxed text-slate-600 text-xs">예약 목록 상단에 <b>숙소별 인원 칩</b>이 추가됐습니다. 날짜를 오늘로 맞추면 어느 숙소에 몇 명 오는지 바로 보입니다.</p>
+                    </div>
+                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                        <h4 className="font-bold text-sm mb-1 text-slate-800">목록에서 숙소 바로 지정 🏠</h4>
+                        <p className="leading-relaxed text-slate-600 text-xs">숙박 예약의 <b>숙소 칸을 클릭</b>해 <b>블링블링 / 없음</b>을 바로 선택할 수 있습니다. 방 종류가 있는 숙소는 기존처럼 수정 화면에서 변경해 주세요.</p>
+                    </div>
+                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                        <h4 className="font-bold text-sm mb-1 text-slate-800">새 예약에서 상태까지 한 번에 ✅</h4>
+                        <p className="leading-relaxed text-slate-600 text-xs">예약을 만들 때도 <b>상태</b>를 고를 수 있습니다. 로드 손님은 <b>완료</b>로 두고 저장하면, 목록에서 다시 바꿀 필요가 없습니다.</p>
+                    </div>
+                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                        <h4 className="font-bold text-sm mb-1 text-slate-800">예비 번호 추가 📞</h4>
+                        <p className="leading-relaxed text-slate-600 text-xs">전화번호 옆 <b>+ 예비 번호</b>를 누르면 번호를 하나 더 적을 수 있습니다. 예약자와 오시는 분이 다를 때 쓰세요.</p>
                     </div>
                 </div>
                 <DialogFooter className="flex flex-row justify-between items-center border-t border-slate-100 pt-3 sm:pt-4">

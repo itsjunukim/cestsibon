@@ -23,7 +23,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { Plus, Check, Filter, Pencil, Trash2, ArrowUpDown, Download, Columns, Search, Ban, Share2, ChevronLeft, ChevronRight } from "lucide-react"
+import { Plus, Check, Filter, Pencil, Trash2, ArrowUpDown, Download, Columns, Search, Ban, Share2, ChevronLeft, ChevronRight, Bus, Copy } from "lucide-react"
 import { useUserRole } from "@/hooks/useUserRole"
 import * as XLSX from 'xlsx';
 import { ReservationForm } from "@/components/ReservationForm"
@@ -35,7 +35,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase"
-import { useState, Suspense, useEffect, useRef } from "react"
+import { useState, Suspense, useEffect, useRef, useMemo } from "react"
 import { format, addDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns"
 import { ko } from "date-fns/locale"
 import { useSearchParams, useRouter } from "next/navigation"
@@ -49,12 +49,57 @@ type SortConfig = {
     direction: 'asc' | 'desc'
 }
 
+type PickupRow = { id: string; name: string; phone: string | null; people: number }
+type PickupSlot = { time: string; label: string; people: number; rows: PickupRow[] }
+type PickupLocation = { location: string; people: number; count: number; slots: PickupSlot[] }
+type PickupDay = { date: string; people: number; count: number; locations: PickupLocation[] }
+
+type OccupancySummary = {
+    stays: { name: string; people: number; count: number }[]
+    dayPeople: number
+    dayCount: number
+}
+
+/**
+ * 조회 기간의 숙소별 숙박 인원 + 당일 인원 요약 칩.
+ * 색은 예약 유형 뱃지와 같은 규칙(숙박 인디고 / 당일 오렌지)을 그대로 쓴다.
+ */
+function OccupancyChips({ data, className }: { data: OccupancySummary; className?: string }) {
+    if (data.stays.length === 0 && data.dayCount === 0) return null
+    return (
+        <div className={cn("flex items-center gap-1.5 overflow-x-auto md:flex-wrap md:overflow-visible", className)}>
+            {data.stays.map((s) => (
+                <span
+                    key={s.name}
+                    className="inline-flex shrink-0 items-baseline gap-1.5 rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1"
+                    title={`${s.name} · 숙박 ${s.count}건 ${s.people}명`}
+                >
+                    <span className="text-xs font-semibold text-indigo-700">🏠 {s.name}</span>
+                    <span className="text-xs font-bold tabular-nums text-indigo-900">{s.people}명</span>
+                    <span className="text-[10px] tabular-nums text-indigo-400">{s.count}건</span>
+                </span>
+            ))}
+            {data.dayCount > 0 && (
+                <span
+                    className="inline-flex shrink-0 items-baseline gap-1.5 rounded-full border border-orange-100 bg-orange-50 px-2.5 py-1"
+                    title={`당일 ${data.dayCount}건 ${data.dayPeople}명`}
+                >
+                    <span className="text-xs font-semibold text-orange-700">☀️ 당일</span>
+                    <span className="text-xs font-bold tabular-nums text-orange-900">{data.dayPeople}명</span>
+                    <span className="text-[10px] tabular-nums text-orange-400">{data.dayCount}건</span>
+                </span>
+            )}
+        </div>
+    )
+}
+
 function ReservationsContent() {
     const searchParams = useSearchParams()
     const router = useRouter()
     const { isAdmin } = useUserRole()
 
     const [isDialogOpen, setIsDialogOpen] = useState(false)
+    const [isPickupOpen, setIsPickupOpen] = useState(false)
     const [editingReservation, setEditingReservation] = useState<any>(null)
     const [selectedRowId, setSelectedRowId] = useState<string | null>(null)
     const tableRef = useRef<HTMLDivElement>(null)
@@ -177,6 +222,21 @@ function ReservationsContent() {
     const supabase = createClient()
     const queryClient = useQueryClient()
 
+    // 목록에서 인라인으로 지정할 수 있는 유일한 숙소. 객실 구분이 없어 잘못 지정될 여지가 없다.
+    const { data: blingAccommodation } = useQuery({
+        queryKey: ["accommodation-bling"],
+        queryFn: async () => {
+            const { data } = await supabase
+                .from("accommodations")
+                .select("id, name")
+                .eq("name", "블링블링")
+                .maybeSingle()
+            return data
+        },
+        staleTime: 1000 * 60 * 60,
+    })
+    const blingId: string | undefined = (blingAccommodation as any)?.id
+
     const { data: reservations, isLoading } = useQuery({
         queryKey: ["reservations", dateFilterMode, dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : "all", dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : "all", sortConfig],
         queryFn: async () => {
@@ -294,6 +354,27 @@ function ReservationsContent() {
         queryClient.invalidateQueries({ queryKey: ["deposit-alerts"] })
     }
 
+    // 목록에서의 숙소 변경은 '블링블링' 또는 '없음'만 허용한다.
+    // 두 값 모두 객실을 갖지 않으므로, 남아있던 객실 배정은 함께 정리한다.
+    const updateAccommodation = async (id: string, accommodationId: string | null) => {
+        // Optimistic UI Update
+        queryClient.setQueriesData({ queryKey: ["reservations"] }, (old: any) => {
+            if (!old) return old
+            return old.map((res: any) => res.id === id
+                ? {
+                    ...res,
+                    accommodation_id: accommodationId,
+                    accommodations: accommodationId ? { name: "블링블링" } : null,
+                    reservation_rooms: [],
+                }
+                : res)
+        })
+
+        await supabase.from("reservation_rooms").delete().eq("reservation_id", id)
+        await supabase.from("reservations").update({ accommodation_id: accommodationId, room_id: null }).eq("id", id)
+        queryClient.invalidateQueries({ queryKey: ["reservations"] })
+    }
+
     const deleteReservation = async (id: string) => {
         if (!confirm("데이터가 완전히 삭제되며 복구할 수 없습니다.\n정말 '영구 삭제' 하시겠습니까?")) return
         const { error } = await supabase.from("reservations").delete().eq("id", id)
@@ -330,6 +411,7 @@ function ReservationsContent() {
             if (!(
                 res.customer_name?.toLowerCase().includes(kw) ||
                 res.phone?.includes(kw) ||
+                res.phone2?.includes(kw) ||
                 res.notes?.toLowerCase().includes(kw)
             )) {
                 return false;
@@ -357,6 +439,120 @@ function ReservationsContent() {
         
         return true;
     });
+
+    // 픽업 현황: 날짜 → 장소 → 시각 순으로 묶는다.
+    // 같은 시각 건은 한 슬롯에 모여 합승 여부가 바로 보이고, 시각이 다른 건은 시간순으로 늘어놓아
+    // 인접 시간(예: 08:50 / 09:00)을 묶을지는 운영자가 판단한다. 취소 예약은 제외한다.
+    const pickupDays = useMemo<PickupDay[]>(() => {
+        const dayMap = new Map<string, Map<string, Map<string, PickupRow[]>>>()
+
+        ;(filteredReservations || [])
+            .filter((res: any) => res.status !== 'cancelled' && String(res.pickup_location || "").trim())
+            .forEach((res: any) => {
+                const location = String(res.pickup_location).trim()
+                const time = String(res.pickup_time || "").trim()
+
+                if (!dayMap.has(res.date)) dayMap.set(res.date, new Map())
+                const locationMap = dayMap.get(res.date)!
+                if (!locationMap.has(location)) locationMap.set(location, new Map())
+                const slotMap = locationMap.get(location)!
+                if (!slotMap.has(time)) slotMap.set(time, [])
+
+                slotMap.get(time)!.push({
+                    id: res.id,
+                    name: res.customer_name,
+                    phone: res.phone,
+                    people: Number(res.headcount) || 0,
+                })
+            })
+
+        return Array.from(dayMap, ([date, locationMap]) => {
+            const locations: PickupLocation[] = Array.from(locationMap, ([location, slotMap]) => {
+                const slots: PickupSlot[] = Array.from(slotMap, ([time, rows]) => ({
+                    time,
+                    label: time || "시간 미정",
+                    people: rows.reduce((acc, r) => acc + r.people, 0),
+                    rows,
+                })).sort((a, b) => {
+                    // 시간 미정은 항상 마지막
+                    if (!a.time) return 1
+                    if (!b.time) return -1
+                    return a.time.localeCompare(b.time)
+                })
+                return {
+                    location,
+                    slots,
+                    people: slots.reduce((acc, s) => acc + s.people, 0),
+                    count: slots.reduce((acc, s) => acc + s.rows.length, 0),
+                }
+            }).sort((a, b) => b.people - a.people)
+
+            return {
+                date,
+                locations,
+                people: locations.reduce((acc, l) => acc + l.people, 0),
+                count: locations.reduce((acc, l) => acc + l.count, 0),
+            }
+        }).sort((a, b) => a.date.localeCompare(b.date))
+    }, [filteredReservations])
+
+    const pickupTotal = useMemo(() => ({
+        count: pickupDays.reduce((acc, d) => acc + d.count, 0),
+        people: pickupDays.reduce((acc, d) => acc + d.people, 0),
+    }), [pickupDays])
+
+    const handleCopyPickup = async () => {
+        if (pickupDays.length === 0) {
+            alert("복사할 픽업 일정이 없습니다.")
+            return
+        }
+        const text = pickupDays.map((day) => {
+            const head = `[🚌 ${format(new Date(day.date), "M월 d일(E)", { locale: ko })} 픽업]\n총 ${day.count}건 · ${day.people}명`
+            const body = day.locations.map((loc) => {
+                const lines = loc.slots.flatMap((slot) =>
+                    slot.rows.map((r) => `${slot.label} ${r.name} ${r.people}명${r.phone ? ` ${formatPhone(r.phone)}` : ""}`)
+                )
+                return `■ ${loc.location} (${loc.people}명)\n${lines.join("\n")}`
+            }).join("\n\n")
+            return `${head}\n\n${body}`
+        }).join("\n\n")
+
+        try {
+            await navigator.clipboard.writeText(text)
+            alert("픽업 일정이 클립보드에 복사되었습니다.\n원하는 곳에 붙여넣기 해주세요!")
+        } catch {
+            alert("복사에 실패했습니다. 다시 시도해주세요.")
+        }
+    }
+
+    // 숙소별 숙박 인원 / 당일 인원 요약. 이미 불러온 목록으로 계산하므로 추가 조회가 없다.
+    // 취소된 예약은 방문자 합계와 동일하게 제외한다.
+    const occupancy = useMemo<OccupancySummary>(() => {
+        const byAccommodation = new Map<string, { people: number; count: number }>()
+        let dayPeople = 0
+        let dayCount = 0
+
+        ;(filteredReservations || [])
+            .filter((res: any) => res.status !== 'cancelled')
+            .forEach((res: any) => {
+                const people = Number(res.headcount) || 0
+                if (res.reservation_type === 'accommodation') {
+                    const name = res.accommodations?.name || "숙소 미지정"
+                    const prev = byAccommodation.get(name) || { people: 0, count: 0 }
+                    byAccommodation.set(name, { people: prev.people + people, count: prev.count + 1 })
+                } else {
+                    dayPeople += people
+                    dayCount += 1
+                }
+            })
+
+        return {
+            stays: Array.from(byAccommodation, ([name, v]) => ({ name, ...v }))
+                .sort((a, b) => b.people - a.people),
+            dayPeople,
+            dayCount,
+        }
+    }, [filteredReservations])
 
     // Helper to format currency
     const fmtMoney = (amount: any) => Number(amount || 0).toLocaleString() + "원"
@@ -443,6 +639,7 @@ function ReservationsContent() {
         const excelData = filteredReservations.map((res: any) => ({
             "예약자명": res.customer_name,
             "전화번호": formatPhone(res.phone || ""),
+            "전화번호(예비)": formatPhone(res.phone2 || ""),
             "인원": res.headcount,
             "댕댕이": Number(res.dog_count) || 0,
             "이용권": (res.reservation_tickets || []).map((rt: any) => `${rt.tickets?.name}(${rt.quantity})`).join(", ") || "",
@@ -463,6 +660,7 @@ function ReservationsContent() {
         ws['!cols'] = [
             { wch: 12 }, // 예약자명
             { wch: 16 }, // 전화번호
+            { wch: 16 }, // 전화번호(예비)
             { wch: 6  }, // 인원
             { wch: 22 }, // 이용권
             { wch: 18 }, // 숙박
@@ -589,6 +787,10 @@ function ReservationsContent() {
                             <Filter className="h-4 w-4 text-foreground" />
                         </Button>
 
+                        <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-muted text-indigo-600" onClick={() => setIsPickupOpen(true)} title="픽업 현황">
+                            <Bus className="h-4 w-4" />
+                        </Button>
+
                         <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-muted text-blue-600" onClick={handleShareTomorrow} title="내일 예약 카톡 공유">
                             <Share2 className="h-4 w-4" />
                         </Button>
@@ -668,6 +870,99 @@ function ReservationsContent() {
                 </div>
             </div>
 
+            {/* 픽업 현황 */}
+            <Dialog open={isPickupOpen} onOpenChange={setIsPickupOpen}>
+                <DialogContent className="max-w-lg w-[95vw] max-h-[85vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Bus className="h-5 w-5 text-indigo-600" />
+                            픽업 현황
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="flex items-center justify-between border-b pb-3">
+                        <div className="text-sm">
+                            {dateRange?.from && (
+                                <span className="text-muted-foreground">
+                                    {format(dateRange.from, "yyyy-MM-dd")}
+                                    {dateRange.to && format(dateRange.to, "yyyy-MM-dd") !== format(dateRange.from, "yyyy-MM-dd")
+                                        ? ` ~ ${format(dateRange.to, "yyyy-MM-dd")}`
+                                        : ""}
+                                </span>
+                            )}
+                            <span className="ml-2 font-bold text-slate-800 tabular-nums">
+                                {pickupTotal.count}건 · {pickupTotal.people}명
+                            </span>
+                        </div>
+                        <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={handleCopyPickup} disabled={pickupDays.length === 0}>
+                            <Copy className="h-3.5 w-3.5" />
+                            복사
+                        </Button>
+                    </div>
+
+                    {pickupDays.length === 0 ? (
+                        <p className="py-10 text-center text-sm text-muted-foreground">
+                            이 기간에 픽업 예약이 없습니다.
+                        </p>
+                    ) : (
+                        <div className="space-y-5 py-1">
+                            {pickupDays.map((day) => (
+                                <div key={day.date} className="space-y-3">
+                                    {pickupDays.length > 1 && (
+                                        <div className="flex items-baseline gap-2 rounded-md bg-slate-100 px-2.5 py-1.5">
+                                            <span className="text-sm font-bold text-slate-800">
+                                                {format(new Date(day.date), "M월 d일(E)", { locale: ko })}
+                                            </span>
+                                            <span className="text-xs tabular-nums text-slate-500">{day.count}건 · {day.people}명</span>
+                                        </div>
+                                    )}
+
+                                    {day.locations.map((loc) => (
+                                        <div key={loc.location} className="space-y-2">
+                                            <div className="flex items-baseline justify-between border-b border-dashed pb-1">
+                                                <span className="text-sm font-bold text-indigo-700">🚌 {loc.location}</span>
+                                                <span className="text-xs font-semibold tabular-nums text-slate-500">
+                                                    {loc.people}명 · {loc.count}건
+                                                </span>
+                                            </div>
+
+                                            {loc.slots.map((slot) => (
+                                                <div key={`${loc.location}-${slot.label}`} className="flex gap-3">
+                                                    <div className={cn(
+                                                        "w-16 shrink-0 pt-0.5 text-sm font-bold tabular-nums",
+                                                        slot.time ? "text-slate-900" : "text-slate-400"
+                                                    )}>
+                                                        {slot.label}
+                                                    </div>
+                                                    <div className="min-w-0 flex-1 space-y-0.5">
+                                                        {slot.rows.map((r) => (
+                                                            <div key={r.id} className="flex items-baseline justify-between gap-2">
+                                                                <span className="truncate text-sm">
+                                                                    <span className="font-medium">{r.name}</span>
+                                                                    <span className="ml-1 text-muted-foreground">{r.people}명</span>
+                                                                </span>
+                                                                {r.phone && (
+                                                                    <a
+                                                                        href={`tel:${r.phone}`}
+                                                                        className="shrink-0 text-xs tabular-nums text-slate-500 hover:text-indigo-600 hover:underline"
+                                                                    >
+                                                                        {formatPhone(r.phone)}
+                                                                    </a>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ))}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
+
             {/* Desktop View */}
             <Card ref={tableRef} className="hidden md:block">
                 <CardHeader>
@@ -698,6 +993,7 @@ function ReservationsContent() {
                             )
                         })()}
                     </div>
+                    <OccupancyChips data={occupancy} className="mt-3" />
                 </CardHeader>
                 <CardContent className="overflow-x-auto">
                     <Table>
@@ -794,19 +1090,51 @@ function ReservationsContent() {
                                         <TableCell className="whitespace-nowrap">
                                             <div className="font-semibold">{res.customer_name}</div>
                                             <div className="text-xs text-foreground font-medium mt-1">{formatPhone(res.phone || "") || "-"}</div>
+                                            {res.phone2 && (
+                                                <div className="text-xs text-muted-foreground font-medium mt-0.5">
+                                                    <span className="text-[10px] text-slate-400 mr-1">예비</span>
+                                                    {formatPhone(res.phone2)}
+                                                </div>
+                                            )}
                                         </TableCell>
                                     )}
                                     {visibleColumns.headcount && <TableCell>{res.headcount || 1}명</TableCell>}
                                     {visibleColumns.dog_count && <TableCell>{Number(res.dog_count) || 0}마리</TableCell>}
-                                    {visibleColumns.accommodation && (
-                                        <TableCell className="max-w-[120px] truncate" title={res.accommodations?.name ? `${res.accommodations.name}${res.reservation_rooms && res.reservation_rooms.length > 0 ? ` (${res.reservation_rooms.map((rr:any)=>rr.rooms?.name).join(', ')})` : ""}` : ""}>
-                                            {res.accommodations?.name ? (
-                                                <span className="font-medium text-indigo-600">
-                                                    🏠 {res.accommodations.name}{res.reservation_rooms && res.reservation_rooms.length > 0 ? ` (${res.reservation_rooms.map((rr:any)=>rr.rooms?.name).join(', ')})` : ""}
+                                    {visibleColumns.accommodation && (() => {
+                                        const roomSuffix = res.reservation_rooms && res.reservation_rooms.length > 0
+                                            ? ` (${res.reservation_rooms.map((rr: any) => rr.rooms?.name).join(', ')})`
+                                            : ""
+                                        // 숙박 예약만 숙소를 가진다(수정 화면과 동일한 규칙). 그리고 객실이 있는 숙소는
+                                        // 객실 배정이 어긋날 수 있어 목록에서 바꾸지 않고 수정 화면에서만 변경한다.
+                                        const canPickInline = !!blingId
+                                            && res.reservation_type === 'accommodation'
+                                            && (!res.accommodation_id || res.accommodation_id === blingId)
+                                        return (
+                                        <TableCell className="max-w-[140px]" title={res.accommodations?.name ? `${res.accommodations.name}${roomSuffix}` : ""}>
+                                            {canPickInline ? (
+                                                <div onClick={(e) => e.stopPropagation()}>
+                                                    <Select
+                                                        value={res.accommodation_id || "none"}
+                                                        onValueChange={(val) => updateAccommodation(res.id, val === "none" ? null : val)}
+                                                        disabled={!isAdmin}
+                                                    >
+                                                        <SelectTrigger className={`h-7 w-fit gap-1 rounded-md border-0 bg-transparent px-2 text-xs font-medium shadow-none hover:bg-muted focus:ring-0 focus:ring-offset-0 ${res.accommodation_id ? "text-indigo-600" : "text-muted-foreground"}`}>
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value={blingId as string}>🏠 블링블링</SelectItem>
+                                                            <SelectItem value="none">없음</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                            ) : res.accommodations?.name ? (
+                                                <span className="block truncate font-medium text-indigo-600">
+                                                    🏠 {res.accommodations.name}{roomSuffix}
                                                 </span>
                                             ) : "-"}
                                         </TableCell>
-                                    )}
+                                        )
+                                    })()}
                                     {visibleColumns.ticket && (
                                         <TableCell className="max-w-[200px]">
                                             {res.reservation_tickets?.length > 0 ? (
@@ -942,20 +1270,23 @@ function ReservationsContent() {
                     const totalPeople = activeForTotals.reduce((acc: number, r: any) => acc + (Number(r.headcount) || 0), 0)
                     const totalDogs = activeForTotals.reduce((acc: number, r: any) => acc + (Number(r.dog_count) || 0), 0)
                     return (
-                        <div className="flex items-center justify-between gap-3 rounded-lg border bg-white p-3 shadow-sm">
-                            <span className="text-sm font-semibold text-muted-foreground">
-                                예약 {(filteredReservations || []).length}건
-                            </span>
-                            <div className="flex items-center gap-4">
-                                <div className="flex items-baseline gap-1">
-                                    <span className="text-xs text-muted-foreground">방문자</span>
-                                    <span className="text-base font-bold text-slate-700 tabular-nums">{totalPeople.toLocaleString()}명</span>
-                                </div>
-                                <div className="flex items-baseline gap-1">
-                                    <span className="text-xs text-muted-foreground">댕댕이</span>
-                                    <span className="text-base font-bold text-slate-700 tabular-nums">{totalDogs.toLocaleString()}마리</span>
+                        <div className="rounded-lg border bg-white p-3 shadow-sm">
+                            <div className="flex items-center justify-between gap-3">
+                                <span className="text-sm font-semibold text-muted-foreground">
+                                    예약 {(filteredReservations || []).length}건
+                                </span>
+                                <div className="flex items-center gap-4">
+                                    <div className="flex items-baseline gap-1">
+                                        <span className="text-xs text-muted-foreground">방문자</span>
+                                        <span className="text-base font-bold text-slate-700 tabular-nums">{totalPeople.toLocaleString()}명</span>
+                                    </div>
+                                    <div className="flex items-baseline gap-1">
+                                        <span className="text-xs text-muted-foreground">댕댕이</span>
+                                        <span className="text-base font-bold text-slate-700 tabular-nums">{totalDogs.toLocaleString()}마리</span>
+                                    </div>
                                 </div>
                             </div>
+                            <OccupancyChips data={occupancy} className="mt-2.5" />
                         </div>
                     )
                 })()}
@@ -980,6 +1311,11 @@ function ReservationsContent() {
                                         </CardTitle>
                                         <CardDescription className="mt-1 text-foreground font-medium">
                                             {format(new Date(res.date), "yyyy-MM-dd(E)", { locale: ko })} • {formatPhone(res.phone || "") || "연락처 없음"}
+                                            {res.phone2 && (
+                                                <span className="block text-muted-foreground mt-0.5">
+                                                    예비 {formatPhone(res.phone2)}
+                                                </span>
+                                            )}
                                         </CardDescription>
                                     </div>
                                     <div onClick={(e) => e.stopPropagation()} className="relative z-[2]">

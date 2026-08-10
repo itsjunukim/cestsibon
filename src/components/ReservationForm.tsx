@@ -34,6 +34,7 @@ const formSchema = z.object({
     reservation_type: z.enum(["accommodation", "day"]),
     customer_name: z.string().min(2, "이름을 입력해주세요"),
     phone: z.string().optional(),
+    phone2: z.string().optional(),
     date: z.date(),
     headcount: z.string().min(1, "인원을 입력해주세요"), // Changed to string to avoid z.coerce issues
     dog_count: z.string().optional(),
@@ -68,12 +69,20 @@ const formSchema = z.object({
 
 type ReservationFormValues = z.infer<typeof formSchema>
 
+// 예약 상태 토글 (수정 화면 전용). 활성 색상은 예약 목록의 상태 뱃지와 동일한 규칙을 따른다.
+const STATUS_OPTIONS = [
+    { value: "booked", label: "예약됨", activeClass: "bg-white shadow-sm text-yellow-700 ring-1 ring-yellow-100" },
+    { value: "completed", label: "완료", activeClass: "bg-white shadow-sm text-green-700 ring-1 ring-green-100" },
+    { value: "cancelled", label: "취소됨", activeClass: "bg-white shadow-sm text-red-700 ring-1 ring-red-100" },
+] as const
+
 export interface ReservationData {
     id: string
     reservation_type?: 'accommodation' | 'day' | null
     status?: string | null
     customer_name?: string | null
     phone?: string | null
+    phone2?: string | null
     date?: string | Date | null
     headcount?: number | string | null
     dog_count?: number | string | null
@@ -103,6 +112,8 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
     const [isLoading, setIsLoading] = useState(false)
     const [isCalendarOpen, setIsCalendarOpen] = useState(false)
     const [typeSelected, setTypeSelected] = useState(!!initialData)
+    // 예비 번호는 쓰는 일이 드물어 기본으로 감추고, 이미 값이 있으면 펼친 채로 시작한다
+    const [showPhone2, setShowPhone2] = useState(!!initialData?.phone2)
     const [isSplitModalOpen, setIsSplitModalOpen] = useState(false)
     const [splitDraft, setSplitDraft] = useState<{ method: string; amount: string }[]>([])
     const queryClient = useQueryClient()
@@ -149,6 +160,7 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
             status: initialData?.status || "booked",
             customer_name: initialData?.customer_name || "",
             phone: initialData?.phone || "",
+            phone2: initialData?.phone2 || "",
             date: initialData?.date ? new Date(initialData.date) : new Date(),
             headcount: initialData?.headcount ? String(initialData.headcount) : "1",
             dog_count: initialData?.dog_count != null ? String(initialData.dog_count) : "0",
@@ -452,6 +464,28 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                                 </div>
                             </div>
                             
+                            <div className="flex items-center gap-3">
+                                <div className="w-px h-6 bg-slate-200"></div>
+                                <span className="text-xs font-semibold text-slate-500 shrink-0">상태</span>
+                                <div className="inline-flex items-center bg-slate-100 p-1 rounded-lg gap-1">
+                                    {STATUS_OPTIONS.map((opt) => (
+                                        <button
+                                            key={opt.value}
+                                            type="button"
+                                            onClick={() => form.setValue("status", opt.value, { shouldDirty: true })}
+                                            className={cn(
+                                                "px-3.5 py-1.5 rounded-md text-sm font-semibold transition-all",
+                                                form.watch("status") === opt.value
+                                                    ? opt.activeClass
+                                                    : "text-slate-500 hover:text-slate-700"
+                                            )}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
                             {initialData?.id && (
                                 <div className="flex items-center gap-4">
                                     <div className="w-px h-6 bg-slate-200"></div>
@@ -543,7 +577,19 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                     name="phone"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>전화번호</FormLabel>
+                            <div className="flex items-center justify-between">
+                                <FormLabel>전화번호</FormLabel>
+                                {!showPhone2 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPhone2(true)}
+                                        className="flex items-center gap-0.5 text-[11px] font-semibold text-slate-400 hover:text-indigo-600 transition-colors"
+                                    >
+                                        <Plus className="h-3 w-3" />
+                                        예비 번호
+                                    </button>
+                                )}
+                            </div>
                             <FormControl>
                                 <Input placeholder="010-1234-5678" {...field} onChange={(e) => field.onChange(formatPhone(e.target.value))} />
                             </FormControl>
@@ -551,6 +597,35 @@ export function ReservationForm({ onSuccess, initialData }: ReservationFormProps
                         </FormItem>
                     )}
                 />
+
+                {showPhone2 && (
+                    <FormField
+                        control={form.control}
+                        name="phone2"
+                        render={({ field }) => (
+                            <FormItem>
+                                <div className="flex items-center justify-between">
+                                    <FormLabel>전화번호 (예비)</FormLabel>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            form.setValue("phone2", "", { shouldDirty: true })
+                                            setShowPhone2(false)
+                                        }}
+                                        className="flex items-center gap-0.5 text-[11px] font-semibold text-slate-400 hover:text-red-600 transition-colors"
+                                    >
+                                        <X className="h-3 w-3" />
+                                        삭제
+                                    </button>
+                                </div>
+                                <FormControl>
+                                    <Input placeholder="010-1234-5678" {...field} onChange={(e) => field.onChange(formatPhone(e.target.value))} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                )}
 
                 <div className="grid grid-cols-2 gap-3">
                     <FormField

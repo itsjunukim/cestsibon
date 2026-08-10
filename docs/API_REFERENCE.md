@@ -126,6 +126,7 @@ CREATE TABLE reservations (
 | date | DATE | 체크인 날짜 |
 | customer_name | VARCHAR | 고객명 |
 | phone | VARCHAR | 전화번호 |
+| phone2 | TEXT | 전화번호 (예비) — 예약자와 실제 방문자가 다른 경우 등에 쓰는 보조 연락처. 선택 항목 |
 | email | VARCHAR | 이메일 |
 | reservation_type | VARCHAR | 예약 타입 (Single/Double/Group) |
 | headcount | INT | 인원수 |
