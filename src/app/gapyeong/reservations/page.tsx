@@ -1164,27 +1164,43 @@ function ReservationsContent() {
                                         const isSplit = splitPayments.length > 0
                                         const fullyPaidByDeposit = Number(res.balance) === 0 && !!res.is_deposit_paid
                                         const settled = isSplit || (!!res.balance_payment_method && res.balance_payment_method !== 'none') || fullyPaidByDeposit
+                                        // 예약금 미입금은 '아직 못 받은 돈'이라 잔금 수단이 확정(settled)됐더라도 우선해서 강조한다.
+                                        // 조건은 아래 '미입금' 배지와 동일하게 맞춰, 박스 색과 배지가 어긋나지 않게 한다.
+                                        const depositUnpaid = !res.is_deposit_paid && Number(res.deposit) > 0
                                         const methodLabel = isSplit
                                             ? splitPayments.map((p: any) => mLabel(p.method)).filter(Boolean).join('+')
                                             : mLabel(res.balance_payment_method)
                                         return (
                                         <TableCell className="whitespace-nowrap">
-                                            <div className={`flex flex-col space-y-1.5 text-xs p-2 rounded-md border min-w-[150px] shadow-sm ${settled ? "bg-green-50 border-green-200 border-l-[3px] border-l-green-400" : "bg-slate-50/50 border-slate-200"}`}>
-                                                <div className={`flex justify-between items-center border-b pb-1.5 mb-0.5 ${settled ? "border-green-100" : "border-slate-200"}`}>
+                                            <div className={cn(
+                                                "flex flex-col space-y-1.5 text-xs p-2 rounded-md border min-w-[150px] shadow-sm",
+                                                depositUnpaid
+                                                    ? "bg-amber-50 border-amber-300 border-l-[3px] border-l-amber-500"
+                                                    : settled
+                                                        ? "bg-green-50 border-green-200 border-l-[3px] border-l-green-400"
+                                                        : "bg-slate-50/50 border-slate-200"
+                                            )}>
+                                                <div className={cn(
+                                                    "flex justify-between items-center border-b pb-1.5 mb-0.5",
+                                                    depositUnpaid ? "border-amber-200" : settled ? "border-green-100" : "border-slate-200"
+                                                )}>
                                                     <span className="text-slate-700 font-bold text-[11px]">총 결제 금액</span>
                                                     <span className="font-extrabold text-foreground text-[14px]">{fmtMoney(res.total_amount)}</span>
                                                 </div>
                                                 <div className="flex justify-between items-center text-[11px]">
                                                     <span className="text-slate-600 font-bold">예약금</span>
                                                     <div className="flex items-center gap-1.5">
-                                                        <span className={res.is_deposit_paid ? "text-green-700 font-bold" : "text-slate-800 font-bold"}>{fmtMoney(res.deposit)}</span>
+                                                        <span className={cn(
+                                                            "font-bold",
+                                                            res.is_deposit_paid ? "text-green-700" : depositUnpaid ? "text-amber-900" : "text-slate-800"
+                                                        )}>{fmtMoney(res.deposit)}</span>
                                                         {res.is_deposit_paid && res.deposit_paid_date && (
                                                             <span className="text-[10px] text-green-800 bg-green-100 px-1 rounded-sm font-bold shadow-sm">
                                                                 {format(new Date(res.deposit_paid_date), "MM/dd")} 완
                                                             </span>
                                                         )}
-                                                        {!res.is_deposit_paid && Number(res.deposit) > 0 && (
-                                                            <span className="text-[10px] text-amber-800 bg-amber-100 px-1 rounded-sm font-bold shadow-sm">미입금</span>
+                                                        {depositUnpaid && (
+                                                            <span className="text-[10px] text-amber-900 bg-amber-200 px-1 rounded-sm font-bold shadow-sm">미입금</span>
                                                         )}
                                                     </div>
                                                 </div>
@@ -1369,7 +1385,15 @@ function ReservationsContent() {
                                     </div>
                                     <div className="flex justify-between text-xs mt-1">
                                         <span className="text-foreground font-medium">예약금</span>
-                                        <span className="font-medium">{fmtMoney(res.deposit)}</span>
+                                        <div className="flex items-center gap-1.5">
+                                            {!res.is_deposit_paid && Number(res.deposit) > 0 && (
+                                                <span className="text-[10px] text-amber-900 bg-amber-200 px-1 rounded-sm font-bold">미입금</span>
+                                            )}
+                                            <span className={cn(
+                                                "font-medium",
+                                                !res.is_deposit_paid && Number(res.deposit) > 0 && "text-amber-900 font-bold"
+                                            )}>{fmtMoney(res.deposit)}</span>
+                                        </div>
                                     </div>
                                     {Number(res.refund) > 0 &&
                                         <div className="flex justify-between text-xs">
