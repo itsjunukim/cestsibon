@@ -23,7 +23,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { Plus, Check, Filter, Pencil, Trash2, ArrowUpDown, Download, Columns, Search, Ban, Share2, ChevronLeft, ChevronRight, Bus, Copy } from "lucide-react"
+import { Plus, Check, Filter, Pencil, Trash2, ArrowUpDown, Download, Columns, Search, Ban, Share2, ChevronLeft, ChevronRight, Bus, Copy, EyeOff } from "lucide-react"
 import { useUserRole } from "@/hooks/useUserRole"
 import * as XLSX from 'xlsx';
 import { ReservationForm } from "@/components/ReservationForm"
@@ -133,6 +133,9 @@ function ReservationsContent() {
 
     const [paymentFilter, setPaymentFilter] = useState<string | null>(searchParams.get('payment'))
 
+    // 완료 건 숨기기. 기본은 끔 — 새로고침 후 켜진 채로 시작하면 예약이 사라진 것처럼 보인다.
+    const [hideCompleted, setHideCompleted] = useState<boolean>(searchParams.get('hideDone') === '1')
+
     useEffect(() => {
         const startParam = searchParams.get('start')
         const endParam = searchParams.get('end')
@@ -143,7 +146,18 @@ function ReservationsContent() {
         if (paymentParam !== null) {
             setPaymentFilter(paymentParam)
         }
+        setHideCompleted(searchParams.get('hideDone') === '1')
     }, [searchParams])
+
+    // 새로고침·링크 공유에서 유지되도록 URL 에도 반영한다 (결제 필터와 같은 방식).
+    const toggleHideCompleted = () => {
+        const next = !hideCompleted
+        setHideCompleted(next)
+        const url = new URL(window.location.href)
+        if (next) url.searchParams.set('hideDone', '1')
+        else url.searchParams.delete('hideDone')
+        router.replace(url.pathname + url.search)
+    }
 
     const [searchKeyword, setSearchKeyword] = useState<string>("")
 
@@ -405,7 +419,8 @@ function ReservationsContent() {
     }
 
     // Client-side filtering
-    const filteredReservations = reservations?.filter((res: any) => {
+    // '완료 숨기기'를 뺀 나머지 조건만 먼저 적용한다. 이래야 숨겨진 완료 건수를 정확히 셀 수 있다.
+    const baseFiltered = reservations?.filter((res: any) => {
         if (searchKeyword) {
             const kw = searchKeyword.toLowerCase();
             if (!(
@@ -439,6 +454,13 @@ function ReservationsContent() {
         
         return true;
     });
+
+    // 완료 처리된 건은 더 볼 일이 없으므로, 바쁜 날 한 번의 클릭으로 걷어낸다.
+    // 숨긴 건수를 버튼에 그대로 보여줘서 "사라진 게 아니라 내가 숨긴 것"임이 드러나게 한다.
+    const completedCount = (baseFiltered || []).filter((res: any) => res.status === 'completed').length
+    const filteredReservations = hideCompleted
+        ? baseFiltered?.filter((res: any) => res.status !== 'completed')
+        : baseFiltered
 
     // 픽업 현황: 날짜 → 장소 → 시각 순으로 묶는다.
     // 같은 시각 건은 한 슬롯에 모여 합승 여부가 바로 보이고, 시각이 다른 건은 시간순으로 늘어놓아
@@ -725,15 +747,34 @@ function ReservationsContent() {
                             </button>
                         </div>
                     )}
-                    <div className="relative w-full md:w-56 lg:w-64">
-                        <Search className="absolute left-2.5 top-[8.5px] h-4 w-4 text-muted-foreground" />
-                        <Input
-                            type="text"
-                            placeholder="이름, 연락처, 메모 검색..."
-                            className="pl-8 bg-white h-9 shadow-sm"
-                            value={searchKeyword}
-                            onChange={(e) => setSearchKeyword(e.target.value)}
-                        />
+                    <div className="flex items-center gap-2 w-full md:contents">
+                        <div className="relative flex-1 md:flex-none md:w-56 lg:w-64">
+                            <Search className="absolute left-2.5 top-[8.5px] h-4 w-4 text-muted-foreground" />
+                            <Input
+                                type="text"
+                                placeholder="이름, 연락처, 메모 검색..."
+                                className="pl-8 bg-white h-9 shadow-sm"
+                                value={searchKeyword}
+                                onChange={(e) => setSearchKeyword(e.target.value)}
+                            />
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={toggleHideCompleted}
+                            disabled={completedCount === 0 && !hideCompleted}
+                            title={hideCompleted ? "완료된 예약 다시 보기" : "완료된 예약을 목록에서 숨깁니다"}
+                            className={cn(
+                                "flex h-9 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold shadow-sm transition-colors whitespace-nowrap",
+                                "disabled:opacity-40 disabled:cursor-not-allowed",
+                                hideCompleted
+                                    ? "border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                                    : "border-input bg-white text-slate-600 hover:bg-slate-50"
+                            )}
+                        >
+                            <EyeOff className="h-3.5 w-3.5" />
+                            {hideCompleted ? `완료 ${completedCount}건 숨김` : "완료 숨기기"}
+                        </button>
                     </div>
 
                     <div className="flex items-stretch gap-2 w-full md:contents">
