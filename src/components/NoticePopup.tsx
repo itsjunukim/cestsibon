@@ -18,8 +18,8 @@ export function NoticePopup() {
             return
         }
 
-        const hideNoticePermanently = localStorage.getItem("hideUpdateNotice_202608_v9")
-        const hideNoticeThisSession = sessionStorage.getItem("hideUpdateNoticeSession_202608_v9")
+        const hideNoticePermanently = localStorage.getItem("hideUpdateNotice_202608_v10")
+        const hideNoticeThisSession = sessionStorage.getItem("hideUpdateNoticeSession_202608_v10")
 
         if (!hideNoticePermanently && !hideNoticeThisSession) {
             // Small delay to let page render first
@@ -32,10 +32,10 @@ export function NoticePopup() {
 
     const handleClose = () => {
         if (doNotShow) {
-            localStorage.setItem("hideUpdateNotice_202608_v9", "true")
+            localStorage.setItem("hideUpdateNotice_202608_v10", "true")
         } else {
             // 세션 스토리지에 저장하여, 탭을 닫거나 재로그인하기 전까지는 다시 안 뜨게 함
-            sessionStorage.setItem("hideUpdateNoticeSession_202608_v9", "true")
+            sessionStorage.setItem("hideUpdateNoticeSession_202608_v10", "true")
         }
         setOpen(false)
     }
@@ -51,29 +51,21 @@ export function NoticePopup() {
                         <div className="bg-primary/10 p-2 rounded-full">
                             <Megaphone className="h-5 w-5 text-primary" />
                         </div>
-                        시스템 업데이트 안내 (2026-08-10)
+                        시스템 업데이트 안내 (2026-08-18)
                     </DialogTitle>
                 </DialogHeader>
                 <div className="space-y-3 py-4 text-sm text-slate-700">
                     <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                        <h4 className="font-bold text-sm mb-1 text-slate-800">픽업 인원 모아보기 🚌</h4>
-                        <p className="leading-relaxed text-slate-600 text-xs">목록 툴바의 <b>🚌 버튼</b>을 누르면 조회 기간의 픽업이 <b>장소별·시간순</b>으로 정리됩니다. 전화번호를 누르면 바로 통화되고, <b>복사</b> 버튼으로 기사님께 그대로 보낼 수 있습니다.</p>
+                        <h4 className="font-bold text-sm mb-1 text-slate-800">완료된 예약 숨기기 👁</h4>
+                        <p className="leading-relaxed text-slate-600 text-xs">예약이 많은 날, 검색창 오른쪽 <b>완료 숨기기</b>를 한 번 누르면 처리 끝난 건이 빠지고 <b>남은 예약만</b> 보입니다. 버튼에 숨긴 건수가 표시되니 예약이 사라진 게 아니라는 것도 바로 확인됩니다. 다시 누르면 전부 돌아옵니다.</p>
                     </div>
                     <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                        <h4 className="font-bold text-sm mb-1 text-slate-800">숙소별 인원 한눈에 📊</h4>
-                        <p className="leading-relaxed text-slate-600 text-xs">예약 목록 상단에 <b>숙소별 인원 칩</b>이 추가됐습니다. 날짜를 오늘로 맞추면 어느 숙소에 몇 명 오는지 바로 보입니다.</p>
+                        <h4 className="font-bold text-sm mb-1 text-slate-800">예약금 미입금이 호박색으로 🟨</h4>
+                        <p className="leading-relaxed text-slate-600 text-xs">예약금을 아직 못 받은 건은 결제 정보 박스가 <b>호박색</b>으로 바뀝니다. 특히 <b>잔금 결제수단을 입력해 둔 예약</b>은 예전에 초록색으로 보여서 미입금인 걸 놓치기 쉬웠는데, 이제 호박색이 우선 표시됩니다.</p>
                     </div>
-                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                        <h4 className="font-bold text-sm mb-1 text-slate-800">목록에서 숙소 바로 지정 🏠</h4>
-                        <p className="leading-relaxed text-slate-600 text-xs">숙박 예약의 <b>숙소 칸을 클릭</b>해 <b>블링블링 / 없음</b>을 바로 선택할 수 있습니다. 방 종류가 있는 숙소는 기존처럼 수정 화면에서 변경해 주세요.</p>
-                    </div>
-                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                        <h4 className="font-bold text-sm mb-1 text-slate-800">새 예약에서 상태까지 한 번에 ✅</h4>
-                        <p className="leading-relaxed text-slate-600 text-xs">예약을 만들 때도 <b>상태</b>를 고를 수 있습니다. 로드 손님은 <b>완료</b>로 두고 저장하면, 목록에서 다시 바꿀 필요가 없습니다.</p>
-                    </div>
-                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                        <h4 className="font-bold text-sm mb-1 text-slate-800">예비 번호 추가 📞</h4>
-                        <p className="leading-relaxed text-slate-600 text-xs">전화번호 옆 <b>+ 예비 번호</b>를 누르면 번호를 하나 더 적을 수 있습니다. 예약자와 오시는 분이 다를 때 쓰세요.</p>
+                    <div className="bg-amber-50 p-3 rounded-lg border border-amber-200">
+                        <h4 className="font-bold text-sm mb-1 text-amber-900">이용권 잘못 선택되던 문제 수정 🔧</h4>
+                        <p className="leading-relaxed text-amber-800 text-xs">예약 수정 화면에서 이용권을 고를 때, <b>스크롤한 직후 클릭하면 다른 이용권이 추가되던 문제</b>를 고쳤습니다.<br/><b>확인 부탁드립니다</b>: 이전에 저장된 예약 중 이용권이 실제와 다르게 들어간 건이 있을 수 있습니다. 금액이 안 맞는 예약이 보이면 이용권을 다시 확인해 주세요.</p>
                     </div>
                 </div>
                 <DialogFooter className="flex flex-row justify-between items-center border-t border-slate-100 pt-3 sm:pt-4">
