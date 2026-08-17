@@ -53,7 +53,20 @@ function SelectTrigger({
 function SelectContent({
   className,
   children,
-  position = "item-aligned",
+  // popper 로 고정한다. item-aligned 로 되돌리지 말 것.
+  //
+  // Radix 의 item-aligned 모드는 목록이 화면보다 길 때 'expand-on-scroll' 로 동작한다.
+  // 첫 스크롤에서 리스트를 스크롤하는 대신 패널 자체를 키우고 위치를 옮긴다.
+  // 이용권 드롭다운(45개)에서 실측한 값:
+  //   패널 높이 407px -> 773px, top 376px -> 10px (366px 점프), scrollTop 은 4 로 클램프
+  // 그래서 사용자가 항목을 고르려고 스크롤한 순간 리스트가 커서 밑에서 수백 px 밀려버리고,
+  // 보고 클릭한 항목과 실제로 선택되는 항목이 달라진다.
+  // (실제 제보: '스키or보드 라이딩 1회' 클릭 -> '성수기/오전 무제한' 이 추가됨)
+  //
+  // popper 모드는 트리거에 고정되어 패널 크기·위치가 변하지 않고 리스트만 제자리에서
+  // 스크롤된다(실측: 높이·top 불변). 아래 max-h-(--radix-select-content-available-height) 도
+  // popper 모드에서만 정의되는 변수라, 높이 제한이 실제로 걸리려면 popper 여야 한다.
+  position = "popper",
   align = "center",
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Content>) {
